@@ -221,15 +221,20 @@ namespace Plugin.Sync
         private void UpdateFromMonsterModel(Monster monster, MonsterModel monsterModel)
         {
             var parts = monsterModel.Parts;
-            if (monster.Parts.Count != 0 && monster.Parts.Count != parts.Count)
+            if (monster.Parts.Count == 0 || monster.Ailments.Count == 0)
             {
-                Logger.Error("Cannot find all parts to update!");
+                return;
+            }
+            
+            if (monster.Parts.Count != parts.Count)
+            {
+                Logger.Trace("Cannot find all parts to update!");
                 return;
             }
 
-            if (monster.Ailments.Count != 0 && monster.Ailments.Count != monsterModel.Ailments.Count)
+            if (monster.Ailments.Count != monsterModel.Ailments.Count)
             {
-                Logger.Error("Cannot find all ailments to update!");
+                Logger.Trace("Cannot find all ailments to update!");
                 return;
             }
 
