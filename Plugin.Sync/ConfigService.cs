@@ -9,7 +9,7 @@ namespace Plugin.Sync
     public class Config
     {
         public bool ShowDebugLogs { get; set; } = true;
-        public string ServerUrl { get; set; } = "http://localhost:5001";
+        public string ServerUrl { get; set; } = "https://amadare-mhw-sync.herokuapp.com";
     }
 
     public static class ConfigService

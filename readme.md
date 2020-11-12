@@ -5,6 +5,12 @@ This is plugin for [HunterPie](https://github.com/Haato3o/HunterPie) that allows
 
 > NOTE: this is in relatively early stage, but it in working state.
 
+## Installation
+
+Drag'n'drop this icon below to Plugins screen in HunterPie:
+
+[<img src="https://raw.githubusercontent.com/amadare42/HunterPie.SyncPlugin/master/readme/plugin.svg">](https://raw.githubusercontent.com/amadare42/HunterPie.SyncPlugin/master/Plugin.Sync/bin/Release/module.json)
+
 ## Build & Debug
 
 Due to HunterPie's plugin system, it can be a bit tricky to conveniently debug and rebuild project. Here are steps that are required to setup your environment to make it somewhat usable:
