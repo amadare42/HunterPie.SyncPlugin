@@ -3,7 +3,8 @@ obj/
 /packages/
 riderModule.iml
 /_ReSharper.Caches/
-!bin/Release/Plugin.Sync.dll
 .vs/
 .idea/
 *.DotSettings.user
+!bin/Release/Plugin.Sync.dll
+!bin/Release/module.json

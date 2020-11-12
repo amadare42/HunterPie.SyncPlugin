@@ -1,0 +1,12 @@
+﻿{
+    "Name": "Plugin.Sync",
+    "Description": "Syncs part damage and ailments buildup from party leader to other members",
+    "Author": "Amadare",
+    "Version": "0.1.0",
+    "Update": {
+        "UpdateUrl": "https://raw.githubusercontent.com/amadare42/HunterPie.SyncPlugin/master/Plugin.Sync/bin/Release",
+        "FileHashes": {
+            "Plugin.Sync.dll": "0.1.0"
+        }
+    } 
+}
