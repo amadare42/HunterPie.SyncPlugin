@@ -6,5 +6,5 @@ riderModule.iml
 .vs/
 .idea/
 *.DotSettings.user
-!bin/Release/Plugin.Sync.dll
-!bin/Release/module.json
+!Plugin.Sync.dll
+!module.json
