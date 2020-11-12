@@ -1,15 +1,22 @@
-﻿# HunterPie Sync Plugin
----
+# HunterPie Sync Plugin
 
 This is plugin for [HunterPie](https://github.com/Haato3o/HunterPie) that allows syncing monster buildup data from party-leader to other party members using central server.
 
-> NOTE: this is in relatively early stage, but it in working state.
+> NOTE: this is in relatively early stage, but in working state.
 
 ## Installation
 
-Drag'n'drop this icon below to Plugins screen in HunterPie:
+Drag'n'drop icon below to Plugins screen in HunterPie:
 
 [<img src="https://raw.githubusercontent.com/amadare42/HunterPie.SyncPlugin/master/readme/plugin.svg">](https://raw.githubusercontent.com/amadare42/HunterPie.SyncPlugin/master/Plugin.Sync/bin/Release/module.json)
+
+## Configuration
+
+On first run, in plugin directory `config.json` file will be created. It will be loaded as configuration on plugin initialization.
+
+`ShowDebugLogs`: enable verbose logging
+
+`ServerUrl`: change sync server url. Useful when using local server
 
 ## Build & Debug
 
