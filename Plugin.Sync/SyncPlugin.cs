@@ -30,7 +30,7 @@ namespace Plugin.Sync
             this.UpdateTenderizePart = ReflectionsHelper.CreateUpdateTenderizePartFn();
             this.LeadersMonsterUpdate = ReflectionsHelper.CreateLeadersMonsterUpdateFn();
             this.PeersMonsterUpdate = ReflectionsHelper.CreatePeersMonsterUpdateFn();
-            ConfigService.LoadAndApply();
+            ConfigService.Load();
         }
 
         public void Initialize(Game context)
@@ -62,6 +62,7 @@ namespace Plugin.Sync
             }
             else
             {
+                Logger.Trace("Zone changed, waiting for party to load...");
                 // we need to have party loaded in order to determine if current player is host or not
                 // so if zone changed, but party still doesn't ready, waiting
                 Task.Run(WaitForPartyToLoad);
@@ -75,7 +76,7 @@ namespace Plugin.Sync
 
         private bool IsLeader() => this.Context?.Player.PlayerParty.Members.Any(m => m.IsInParty && m.IsMe && m.IsPartyLeader) ?? false;
 
-        private bool IsPartyLoaded() => this.Context?.Player.PlayerParty.Members.Any(m => m.IsMe && m.IsInParty) ?? false;
+        private bool IsPartyLoaded() => this.Context?.Player.PlayerParty.Members.Any(m => m.IsInParty) ?? false;
 
         private void UpdateSyncState(string trigger)
         {
@@ -88,34 +89,35 @@ namespace Plugin.Sync
                 || this.Context.Player.PlayerParty.Size <= 1
             )
             {
-                Logger.Log($"SyncState: Idle [{trigger}]");
+                if (this.syncService.SetMode(SyncServiceMode.Idle))
+                {
+                    Logger.Log($"SyncState: Idle [{trigger}]");
+                }
                 return;
             }
 
             if (IsLeader())
             {
-                if (this.syncService.Mode == SyncServiceMode.Push)
+                if (this.syncService.SetMode(SyncServiceMode.Push))
                 {
-                    return;
-                }
+                    // if became leader, push all monsters
+                    for (var index = 0; index < this.Context.Monsters.Length; index++)
+                    {
+                        Monster contextMonster = this.Context.Monsters[index];
+                        this.syncService.PushMonster(contextMonster, index);
+                    }
 
-                // if became leader, push all monsters
-                for (var index = 0; index < this.Context.Monsters.Length; index++)
-                {
-                    Monster contextMonster = this.Context.Monsters[index];
-                    this.syncService.PushMonster(contextMonster, index);
+                    Logger.Log($"SyncState: Push [{trigger}]");
                 }
-
-                this.syncService.SetMode(SyncServiceMode.Push);
-                Logger.Log($"SyncState: Push [{trigger}]");
             }
             else
             {
-                this.syncService.SetMode(SyncServiceMode.Poll);
-                Logger.Log($"SyncState: Poll [{trigger}]");
+                if (this.syncService.SetMode(SyncServiceMode.Poll))
+                {
+                    Logger.Log($"SyncState: Poll [{trigger}]");
+                }
             }
         }
-
 
         private async Task WaitForPartyToLoad()
         {
@@ -124,13 +126,15 @@ namespace Plugin.Sync
             {
                 await Task.Delay(100);
             }
+            
+            // to be absolutely sure everyone is loaded
+            await Task.Delay(100);
 
             if (this.Context != null)
             {
                 OnPartyLoaded();
             }
         }
-
 
         private async Task WaitForScan()
         {
@@ -228,13 +232,13 @@ namespace Plugin.Sync
             
             if (monster.Parts.Count != parts.Count)
             {
-                Logger.Trace("Cannot find all parts to update!");
+                Logger.Trace($"Cannot find all parts to update! ({monster.Parts.Count} != {parts.Count})");
                 return;
             }
 
             if (monster.Ailments.Count != monsterModel.Ailments.Count)
             {
-                Logger.Trace("Cannot find all ailments to update!");
+                Logger.Trace($"Cannot find all ailments to update! ({monster.Ailments.Count} != {monsterModel.Ailments.Count})");
                 return;
             }
 

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,13 +14,10 @@ namespace Plugin.Sync.Server
     {
         public string SessionId { get; set; }
 
-        ConcurrentDictionary<int, MonsterModel> CachedMonsters = new ConcurrentDictionary<int, MonsterModel>();
-
-        List<MonsterModel> PushQueue = new List<MonsterModel>();
-
-        private object locker = new object();
-
-        SyncServerClient client = new SyncServerClient();
+        private readonly object locker = new object();
+        private readonly ConcurrentDictionary<int, MonsterModel> cachedMonsters = new ConcurrentDictionary<int, MonsterModel>();
+        private readonly List<MonsterModel> pushQueue = new List<MonsterModel>();
+        private readonly SyncServerClient client = new SyncServerClient();
         private Thread thread;
 
         public void SetState(bool state)
@@ -31,6 +29,11 @@ namespace Plugin.Sync.Server
             {
                 var scanRef = new ThreadStart(PushLoop);
                 this.thread = new Thread(scanRef) {Name = "SyncPlugin_PushLoop"};
+                lock (this.locker)
+                {
+                    this.pushQueue.Clear();
+                    this.cachedMonsters.Clear();
+                }
                 this.thread.Start();
             }
             else
@@ -38,8 +41,8 @@ namespace Plugin.Sync.Server
                 this.thread?.Abort();
                 lock (this.locker)
                 {
-                    this.PushQueue.Clear();
-                    this.CachedMonsters.Clear();
+                    this.pushQueue.Clear();
+                    this.cachedMonsters.Clear();
                 }
             }
         }
@@ -64,25 +67,27 @@ namespace Plugin.Sync.Server
 
             lock (this.locker)
             {
-                if (this.CachedMonsters.TryGetValue(model.Index, out var existingMonster) && existingMonster.Equals(model))
+                if (this.cachedMonsters.TryGetValue(model.Index, out var existingMonster) && existingMonster.Equals(model))
                 {
                     return;
                 }
 
                 // TODO: diffing
-                this.CachedMonsters[model.Index] = model;
-                this.PushQueue.Add(model);
+                this.cachedMonsters[model.Index] = model;
+                this.pushQueue.Add(model);
             }
         }
 
-        public async void PushLoop()
+        private async void PushLoop()
         {
             var retryCount = 0;
+            var sw = new Stopwatch();
 
             while (true)
             {
                 if (string.IsNullOrEmpty(this.SessionId))
                 {
+                    await Task.Delay(50);
                     continue;
                 }
 
@@ -92,31 +97,35 @@ namespace Plugin.Sync.Server
 
                     lock (this.locker)
                     {
-                        monsters = this.PushQueue
+                        monsters = this.pushQueue
                             .GroupBy(m => m.Index)
                             .Select(g => g.Last())
                             .OrderBy(m => m.Index)
                             .ToList();
-                        this.PushQueue.Clear();
+                        this.pushQueue.Clear();
                     }
 
+                    // wait for changes to appear
                     if (!monsters.Any())
                     {
                         await Task.Delay(50);
                         continue;
                     }
 
-                    Util.Logger.Trace($"PUSH RQ monsters: {monsters.Count}");
                     await this.client.PushChangedMonsters(this.SessionId, monsters);
+                    Util.Logger.Trace($"PUSH monsters: {monsters.Count} ({sw.ElapsedMilliseconds} ms from last push)");
+                    sw.Restart();
                     if (retryCount != 0)
                     {
                         retryCount = 0;
                         Util.Logger.Log("Connection restored");
                     }
+                    // throttling
+                    await Task.Delay(300);
                 }
                 catch (Exception ex)
                 {
-                    Util.Logger.Error($"Error on pushing monsters to server. Will retry after 10 sec when new data is available({retryCount++}/10): {ex.Message}");
+                    Util.Logger.Error($"Error on pushing monsters to server. Will retry after 10 sec when new data is available ({retryCount++}/10): {ex.Message}");
                     await Task.Delay(10000);
                     if (retryCount == 10)
                     {

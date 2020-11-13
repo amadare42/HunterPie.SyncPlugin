@@ -34,7 +34,7 @@ namespace Plugin.Sync.Server
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             using var rsp = await this.http.PutAsync($"{BaseUrl}/game/{HttpUtility.UrlEncode(sessionId)}", content);
-            using var httpContent = rsp.EnsureSuccessStatusCode();
+            rsp.EnsureSuccessStatusCode();
         }
 
         public async Task<List<MonsterModel>> PollMonsterChanges(string sessionId, string pollId)
@@ -42,7 +42,7 @@ namespace Plugin.Sync.Server
             var request = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/game/{HttpUtility.UrlEncode(sessionId)}/poll/{pollId}");
 
             using var response = await this.pollingHttp.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-            using var body = await response.Content.ReadAsStreamAsync();
+            using var body = await response.EnsureSuccessStatusCode().Content.ReadAsStreamAsync();
             using var sr = new StreamReader(body);
             using var jsonTextReader = new JsonTextReader(sr);
 

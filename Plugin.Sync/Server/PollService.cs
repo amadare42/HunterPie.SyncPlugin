@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Plugin.Sync.Model;
@@ -11,13 +12,10 @@ namespace Plugin.Sync.Server
     {
         public string SessionId { get; set; }
 
-        private readonly SyncServerClient client = new SyncServerClient();
-
         private readonly SemaphoreSlim semaphore = new SemaphoreSlim(1);
-
-        private Thread thread;
-
         private List<MonsterModel> polledMonsters = CreateDefaultMonstersCollection();
+        private readonly SyncServerClient client = new SyncServerClient();
+        private Thread thread;
 
         public void SetState(bool state)
         {
@@ -51,9 +49,11 @@ namespace Plugin.Sync.Server
         {
             var pollId = Guid.NewGuid().ToString();
             var retryCount = 0;
+            var sw = new Stopwatch();
 
             while (true)
             {
+                // wait for session id
                 if (string.IsNullOrEmpty(this.SessionId))
                 {
                     await Task.Delay(500);
@@ -62,6 +62,9 @@ namespace Plugin.Sync.Server
 
                 try
                 {
+                    // throttling
+                    await Task.Delay(500);
+                    sw.Restart();
                     var changedMonsters = await this.client.PollMonsterChanges(this.SessionId, pollId);
                     if (changedMonsters == null)
                     {
@@ -69,6 +72,7 @@ namespace Plugin.Sync.Server
                     }
 
                     UpdateMonsters(changedMonsters);
+                    Logger.Trace($"Monsters updated: {changedMonsters.Count} ({sw.ElapsedMilliseconds} ms after request started)");
                     if (retryCount != 0)
                     {
                         retryCount = 0;
@@ -95,13 +99,11 @@ namespace Plugin.Sync.Server
 
         private void UpdateMonsters(List<MonsterModel> monsters)
         {
-            this.semaphore.Wait();
-            foreach (MonsterModel monsterModel in monsters)
+            using var borrow = BorrowMonsters(); 
+            foreach (var monsterModel in monsters)
             {
                 this.polledMonsters[monsterModel.Index] = monsterModel;
             }
-
-            this.semaphore.Release();
         }
     }
 }

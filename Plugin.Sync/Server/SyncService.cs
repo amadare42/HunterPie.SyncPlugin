@@ -18,8 +18,13 @@ namespace Plugin.Sync.Server
             this.poll.SessionId = sessionId;
         }
 
-        public void SetMode(SyncServiceMode mode)
+        /// <summary>
+        /// Set sync mode (e.g. direction: push/poll). Returns true if changed.
+        /// </summary>
+        public bool SetMode(SyncServiceMode mode)
         {
+            if (this.Mode == mode) return false;
+            
             switch (mode)
             {
                 case SyncServiceMode.Idle:
@@ -39,6 +44,7 @@ namespace Plugin.Sync.Server
             }
 
             this.Mode = mode;
+            return true;
         }
 
         public void PushMonster(Monster monster, int index) => this.push.PushMonster(monster, index);

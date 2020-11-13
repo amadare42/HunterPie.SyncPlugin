@@ -16,7 +16,7 @@ This is plugin for [HunterPie](https://github.com/Haato3o/HunterPie) that allows
 
 On first run, in plugin directory `config.json` file will be created. It will be loaded as configuration on plugin initialization.
 
-`ShowDebugLogs`: enable verbose logging
+`LogLevel`: set verbosity of plugin logging (Trace, Debug, Warn, Info, Error). Note that this will ignore core application settings. 
 
 `ServerUrl`: change sync server url. Useful when using local server
 
