@@ -59,6 +59,12 @@ namespace Plugin.Sync.Server
 
             while (true)
             {
+                if (token.IsCancellationRequested)
+                {
+                    Logger.Trace($"Poll with '{pollId}' closed.");
+                    return;
+                }
+                
                 // wait for session id
                 if (string.IsNullOrEmpty(this.SessionId))
                 {
@@ -71,14 +77,10 @@ namespace Plugin.Sync.Server
                     // throttling
                     await Task.Delay(500);
                     sw.Restart();
-                    if (token.IsCancellationRequested)
-                    {
-                        Logger.Trace($"Poll with '{pollId}' closed.");
-                        return;
-                    }
                     var changedMonsters = await this.client.PollMonsterChanges(this.SessionId, pollId);
                     if (changedMonsters == null)
                     {
+                        Logger.Trace($"No monsters updates. ({sw.ElapsedMilliseconds} ms after request started)");
                         continue;
                     }
 

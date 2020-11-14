@@ -89,6 +89,12 @@ namespace Plugin.Sync.Server
 
             while (true)
             {
+                if (token.IsCancellationRequested)
+                {
+                    Logger.Debug("Push loop stopped");
+                    return;
+                }
+                
                 if (string.IsNullOrEmpty(this.SessionId))
                 {
                     await Task.Delay(50);
@@ -107,12 +113,6 @@ namespace Plugin.Sync.Server
                             .OrderBy(m => m.Index)
                             .ToList();
                         this.pushQueue.Clear();
-                    }
-
-                    if (token.IsCancellationRequested)
-                    {
-                        Logger.Debug("Push loop stopped");
-                        return;
                     }
 
                     // wait for changes to appear
