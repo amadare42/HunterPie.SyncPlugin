@@ -46,22 +46,33 @@ namespace Plugin.Sync.Util
 
     public class ConsoleTarget : ILoggerTarget
     {
-        public void Log(string message, LogLevel level) => Console.WriteLine($"[{level:G}] {message}");
+        public void Log(string message, LogLevel level)
+        {
+            Console.ForegroundColor = level switch
+            {
+                LogLevel.Error => ConsoleColor.Red,
+                LogLevel.Trace => ConsoleColor.Gray,
+                LogLevel.Warn => ConsoleColor.Yellow,
+                _ => ConsoleColor.White
+            };
+            Console.WriteLine($"{DateTime.Now:HH:mm:ss:ffff} [{level:G}] {message}");
+        }
+
     }
 
     public static class Logger
     {
-        public static string PluginName = "Sync Plugin";
+        public static string Prefix = "[Sync Plugin]";
 
         public static LogLevel LogLevel = LogLevel.Info;
 
         public static ILoggerTarget Target = new HunterPieDebugger();
 
-        public static void Log(string message) => Write($"[{PluginName}] {message}", LogLevel.Info);
-        public static void Error(string message) => Write($"[{PluginName}] {message}", LogLevel.Error);
-
-        public static void Debug(string message) => Write($"[{PluginName}] {message}", LogLevel.Debug);
-        public static void Trace(string message) => Write($"[Trace] [{PluginName}] {message}", LogLevel.Trace);
+        public static void Log(string message) => Write($"{Prefix} {message}", LogLevel.Info);
+        public static void Error(string message) => Write($"{Prefix} {message}", LogLevel.Error);
+        public static void Warn(string message) => Write($"{Prefix} {message}", LogLevel.Warn);
+        public static void Debug(string message) => Write($"{Prefix} {message}", LogLevel.Debug);
+        public static void Trace(string message) => Write($"{Prefix} {message}", LogLevel.Trace);
 
 
         private static void Write(string message, LogLevel level)

@@ -62,7 +62,7 @@ namespace Plugin.Sync
             }
             else
             {
-                Logger.Trace("Zone changed, waiting for party to load...");
+                Logger.Debug("Zone changed, waiting for party to load...");
                 // we need to have party loaded in order to determine if current player is host or not
                 // so if zone changed, but party still doesn't ready, waiting
                 Task.Run(WaitForPartyToLoad);
@@ -77,17 +77,18 @@ namespace Plugin.Sync
         private bool IsLeader() => this.Context?.Player.PlayerParty.Members.Any(m => m.IsInParty && m.IsMe && m.IsPartyLeader) ?? false;
 
         private bool IsPartyLoaded() => this.Context?.Player.PlayerParty.Members.Any(m => m.IsInParty) ?? false;
+        
+        private const int TrainingAreaZoneId = 504;
+
+        private bool IsGameInSyncableState() => !this.Context.Player.InPeaceZone
+                                                && this.Context.Player.ZoneID != TrainingAreaZoneId
+                                                && !string.IsNullOrEmpty(this.Context.Player.SessionID)
+                                                && this.Context.Player.PlayerParty.Size > 1;
 
         private void UpdateSyncState(string trigger)
         {
-            const int TrainingAreaZoneId = 504;
-
             this.syncService.SetSessionId(this.Context.Player.SessionID);
-            if (this.Context.Player.InPeaceZone
-                || this.Context.Player.ZoneID == TrainingAreaZoneId
-                || string.IsNullOrEmpty(this.Context.Player.SessionID)
-                || this.Context.Player.PlayerParty.Size <= 1
-            )
+            if (!IsGameInSyncableState())
             {
                 if (this.syncService.SetMode(SyncServiceMode.Idle))
                 {
@@ -188,7 +189,9 @@ namespace Plugin.Sync
                     if (isLeader)
                     {
                         this.LeadersMonsterUpdate(monster);
-                        if (this.syncService.Mode == SyncServiceMode.Push && !string.IsNullOrEmpty(monster.Id))
+                        if (this.syncService.Mode == SyncServiceMode.Push 
+                            && !string.IsNullOrEmpty(monster.Id)
+                            && IsGameInSyncableState())
                         {
                             this.syncService.PushMonster(monster, index);
                         }
@@ -196,7 +199,9 @@ namespace Plugin.Sync
                     else
                     {
                         this.PeersMonsterUpdate(monster);
-                        if (this.syncService.Mode == SyncServiceMode.Poll && !string.IsNullOrEmpty(monster.Id))
+                        if (this.syncService.Mode == SyncServiceMode.Poll 
+                            && !string.IsNullOrEmpty(monster.Id)
+                            && IsGameInSyncableState())
                         {
                             PullData(monster);
                         }
@@ -230,32 +235,34 @@ namespace Plugin.Sync
                 return;
             }
             
-            if (monster.Parts.Count != parts.Count)
+            if (monster.Parts.Count == parts.Count)
             {
-                Logger.Trace($"Cannot find all parts to update! ({monster.Parts.Count} != {parts.Count})");
-                return;
+                for (var i = 0; i < parts.Count; i++)
+                {
+                    monster.Parts[i].SetPartInfo(parts[i].ToDomain());
+                    monster.Parts[i].IsRemovable = parts[i].IsRemovable;
+                    this.UpdateTenderizePart(monster.Parts[i], parts[i]);
+                }
+            }
+            else
+            {
+                Logger.Debug($"Cannot find all parts to update! ({monster.Parts.Count} != {parts.Count})");
             }
 
-            if (monster.Ailments.Count != monsterModel.Ailments.Count)
+            if (monster.Ailments.Count == monsterModel.Ailments.Count)
             {
-                Logger.Trace($"Cannot find all ailments to update! ({monster.Ailments.Count} != {monsterModel.Ailments.Count})");
-                return;
+                for (var index = 0; index < monsterModel.Ailments.Count; index++)
+                {
+                    var ailmentModel = monsterModel.Ailments[index];
+                    var ailment = monster.Ailments[index];
+                    // TODO: ailments timers should not be synced, since peer member's game keep track of it
+                    // this is here because GetMonsterAilments is disabled, so all ailment data must be sourced from somewhere
+                    ailment.SetAilmentInfo(ailmentModel.ToDomain());
+                }
             }
-
-            for (var i = 0; i < parts.Count; i++)
+            else
             {
-                monster.Parts[i].SetPartInfo(parts[i].ToDomain());
-                monster.Parts[i].IsRemovable = parts[i].IsRemovable;
-                this.UpdateTenderizePart(monster.Parts[i], parts[i]);
-            }
-
-            for (var index = 0; index < monsterModel.Ailments.Count; index++)
-            {
-                AilmentModel ailmentModel = monsterModel.Ailments[index];
-                var ailment = monster.Ailments[index];
-                // TODO: ailments timers should not be synced, since peer members game keep track of it
-                // this is here because GetMonsterAilments is disabled, so all ailment data must be sourced from somewhere
-                ailment.SetAilmentInfo(ailmentModel.ToDomain());
+                Logger.Debug($"Cannot find all ailments to update! ({monster.Ailments.Count} != {monsterModel.Ailments.Count})");
             }
         }
     }

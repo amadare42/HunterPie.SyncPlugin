@@ -6,7 +6,7 @@ This is plugin for [HunterPie](https://github.com/Haato3o/HunterPie) that allows
 
 ## Installation
 
-1. Drag'n'drop icon below to Plugins screen in HunterPie:
+1. Drag'n'drop icon below to into HunterPie window:
 
 [<img src="https://raw.githubusercontent.com/amadare42/HunterPie.SyncPlugin/master/readme/plugin.svg">](https://raw.githubusercontent.com/amadare42/HunterPie.SyncPlugin/master/Plugin.Sync/bin/Release/module.json)
 
