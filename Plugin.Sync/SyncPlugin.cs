@@ -60,9 +60,13 @@ namespace Plugin.Sync
             {
                 UpdateSyncState("zone change");
             }
-            else
+            else if (string.IsNullOrEmpty(this.Context?.Player.SessionID))
             {
-                Logger.Debug("Zone changed, waiting for party to load...");
+                Logger.Debug("Zone changed, but session is missing. Wait for next event.");
+            } 
+            else 
+            {
+                Logger.Log("Zone changed, waiting for party to load...");
                 // we need to have party loaded in order to determine if current player is host or not
                 // so if zone changed, but party still doesn't ready, waiting
                 Task.Run(WaitForPartyToLoad);
@@ -104,7 +108,7 @@ namespace Plugin.Sync
                     // if became leader, push all monsters
                     for (var index = 0; index < this.Context.Monsters.Length; index++)
                     {
-                        Monster contextMonster = this.Context.Monsters[index];
+                        var contextMonster = this.Context.Monsters[index];
                         this.syncService.PushMonster(contextMonster, index);
                     }
 
@@ -185,6 +189,8 @@ namespace Plugin.Sync
                         continue;
                     }
 
+                    // HACK
+                    UpdateSyncState("monster scan");
                     var isLeader = IsLeader();
                     if (isLeader)
                     {
@@ -246,7 +252,7 @@ namespace Plugin.Sync
             }
             else
             {
-                Logger.Debug($"Cannot find all parts to update! ({monster.Parts.Count} != {parts.Count})");
+                Logger.Warn($"Cannot find all parts to update! ({monster.Parts.Count} != {parts.Count})");
             }
 
             if (monster.Ailments.Count == monsterModel.Ailments.Count)
@@ -262,7 +268,7 @@ namespace Plugin.Sync
             }
             else
             {
-                Logger.Debug($"Cannot find all ailments to update! ({monster.Ailments.Count} != {monsterModel.Ailments.Count})");
+                Logger.Warn($"Cannot find all ailments to update! ({monster.Ailments.Count} != {monsterModel.Ailments.Count})");
             }
         }
     }
