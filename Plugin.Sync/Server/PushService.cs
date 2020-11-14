@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using HunterPie.Core;
 using Plugin.Sync.Model;
+using Plugin.Sync.Util;
 
 namespace Plugin.Sync.Server
 {
@@ -18,6 +19,7 @@ namespace Plugin.Sync.Server
         private readonly ConcurrentDictionary<int, MonsterModel> cachedMonsters = new ConcurrentDictionary<int, MonsterModel>();
         private readonly List<MonsterModel> pushQueue = new List<MonsterModel>();
         private readonly SyncServerClient client = new SyncServerClient();
+        private CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
         private Thread thread;
 
         public void SetState(bool state)
@@ -27,7 +29,9 @@ namespace Plugin.Sync.Server
             if (isRunning == state) return;
             if (state)
             {
-                var scanRef = new ThreadStart(PushLoop);
+                this.cancellationTokenSource.Cancel();
+                this.cancellationTokenSource = new CancellationTokenSource();
+                var scanRef = new ThreadStart(() => PushLoop(this.cancellationTokenSource.Token));
                 this.thread = new Thread(scanRef) {Name = "SyncPlugin_PushLoop"};
                 lock (this.locker)
                 {
@@ -38,7 +42,7 @@ namespace Plugin.Sync.Server
             }
             else
             {
-                this.thread?.Abort();
+                this.cancellationTokenSource.Cancel();
                 lock (this.locker)
                 {
                     this.pushQueue.Clear();
@@ -78,7 +82,7 @@ namespace Plugin.Sync.Server
             }
         }
 
-        private async void PushLoop()
+        private async void PushLoop(CancellationToken token)
         {
             var retryCount = 0;
             var sw = new Stopwatch();
@@ -103,6 +107,12 @@ namespace Plugin.Sync.Server
                             .OrderBy(m => m.Index)
                             .ToList();
                         this.pushQueue.Clear();
+                    }
+
+                    if (token.IsCancellationRequested)
+                    {
+                        Logger.Debug("Push loop stopped");
+                        return;
                     }
 
                     // wait for changes to appear

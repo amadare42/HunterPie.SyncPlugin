@@ -16,6 +16,8 @@ namespace Plugin.Sync.Server
         private List<MonsterModel> polledMonsters = CreateDefaultMonstersCollection();
         private readonly SyncServerClient client = new SyncServerClient();
         private Thread thread;
+        
+        private CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
 
         public void SetState(bool state)
         {
@@ -24,13 +26,16 @@ namespace Plugin.Sync.Server
             if (isRunning == state) return;
             if (state)
             {
-                var scanRef = new ThreadStart(PollLoop);
+                this.cancellationTokenSource.Cancel();
+                this.cancellationTokenSource = new CancellationTokenSource();
+                var cancelToken = this.cancellationTokenSource.Token;
+                var scanRef = new ThreadStart(() => PollLoop(cancelToken));
                 this.thread = new Thread(scanRef) {Name = "SyncPlugin_PollLoop"};
                 this.thread.Start();
             }
             else
             {
-                this.thread?.Abort();
+                this.cancellationTokenSource.Cancel();
                 this.semaphore.Wait();
                 this.polledMonsters = CreateDefaultMonstersCollection();
                 this.semaphore.Release();
@@ -45,11 +50,12 @@ namespace Plugin.Sync.Server
 
         private void ReleaseSemaphore() => this.semaphore.Release();
 
-        private async void PollLoop()
+        private async void PollLoop(CancellationToken token)
         {
             var pollId = Guid.NewGuid().ToString();
             var retryCount = 0;
             var sw = new Stopwatch();
+            Logger.Trace($"Started new poll with '{pollId}'");
 
             while (true)
             {
@@ -65,6 +71,11 @@ namespace Plugin.Sync.Server
                     // throttling
                     await Task.Delay(500);
                     sw.Restart();
+                    if (token.IsCancellationRequested)
+                    {
+                        Logger.Trace($"Poll with '{pollId}' closed.");
+                        return;
+                    }
                     var changedMonsters = await this.client.PollMonsterChanges(this.SessionId, pollId);
                     if (changedMonsters == null)
                     {
