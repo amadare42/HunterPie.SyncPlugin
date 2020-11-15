@@ -30,6 +30,7 @@ namespace Plugin.Sync.Server
         {
             var isRunning = this.cancellationTokenSource != null &&
                             !this.cancellationTokenSource.IsCancellationRequested;
+            Logger.Trace($"PollService.SetState -> isRunning: {isRunning}, -> {state}");
             // same state, don't do anything
             if (state == isRunning) return;
             if (state)
@@ -47,7 +48,9 @@ namespace Plugin.Sync.Server
                 this.semaphore.Wait();
                 this.polledMonsters = CreateDefaultMonstersCollection();
                 this.semaphore.Release();
+                this.thread.Join();
             }
+            Logger.Trace("PollService.SetState -> changed");
         }
 
         public Borrow<List<MonsterModel>> BorrowMonsters()

@@ -32,6 +32,7 @@ namespace Plugin.Sync.Server
         {
             var isRunning = this.cancellationTokenSource != null &&
                             !this.cancellationTokenSource.IsCancellationRequested;
+            Logger.Trace($"PushService.SetState -> isRunning: {isRunning}, -> {state}");
             // same state, don't do anything
             if (state == isRunning) return;
             if (state)
@@ -47,7 +48,9 @@ namespace Plugin.Sync.Server
             {
                 this.cancellationTokenSource?.Cancel();
                 ClearQueue();
+                this.thread.Join();
             }
+            Logger.Trace($"PushService.SetState -> changed");
         }
 
         public void PushMonster(Monster monster, int index)

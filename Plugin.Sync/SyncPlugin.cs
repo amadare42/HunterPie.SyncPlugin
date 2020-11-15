@@ -242,7 +242,7 @@ namespace Plugin.Sync
             }
             else
             {
-                Logger.Warn($"Cannot find all parts to update! ({monster.Parts.Count} != {parts.Count})");
+                Logger.Trace($"Parts count mismatch. ({monster.Parts.Count} != {parts.Count})");
             }
 
             if (monster.Ailments.Count == monsterModel.Ailments.Count)
@@ -258,7 +258,7 @@ namespace Plugin.Sync
             }
             else
             {
-                Logger.Warn($"Cannot find all ailments to update! ({monster.Ailments.Count} != {monsterModel.Ailments.Count})");
+                Logger.Trace($"Ailments count mismatch! ({monster.Ailments.Count} != {monsterModel.Ailments.Count})");
             }
         }
     }
