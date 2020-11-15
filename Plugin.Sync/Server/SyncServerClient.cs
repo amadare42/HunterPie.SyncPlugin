@@ -28,20 +28,20 @@ namespace Plugin.Sync.Server
             return JsonConvert.DeserializeObject<MonsterModel[]>(json);
         }
 
-        public async Task PushChangedMonsters(string sessionId, IList<MonsterModel> monsters)
+        public async Task PushChangedMonsters(string sessionId, IList<MonsterModel> monsters, CancellationToken cancellationToken)
         {
             var json = JsonConvert.SerializeObject(monsters);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            using var rsp = await this.http.PutAsync($"{BaseUrl}/game/{HttpUtility.UrlEncode(sessionId)}", content);
+            using var rsp = await this.http.PutAsync($"{BaseUrl}/game/{HttpUtility.UrlEncode(sessionId)}", content, cancellationToken);
             rsp.EnsureSuccessStatusCode();
         }
 
-        public async Task<List<MonsterModel>> PollMonsterChanges(string sessionId, string pollId)
+        public async Task<List<MonsterModel>> PollMonsterChanges(string sessionId, string pollId, CancellationToken cancellationToken)
         {
             var request = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/game/{HttpUtility.UrlEncode(sessionId)}/poll/{pollId}");
 
-            using var response = await this.pollingHttp.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+            using var response = await this.pollingHttp.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             using var body = await response.EnsureSuccessStatusCode().Content.ReadAsStreamAsync();
             using var sr = new StreamReader(body);
             using var jsonTextReader = new JsonTextReader(sr);

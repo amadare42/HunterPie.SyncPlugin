@@ -11,6 +11,7 @@ namespace Plugin.Sync.Server
         private readonly PushService push = new PushService();
         private readonly PollService poll = new PollService();
         public SyncServiceMode Mode { get; private set; }
+        private readonly object locker = new object();
 
         public void SetSessionId(string sessionId)
         {
@@ -23,28 +24,31 @@ namespace Plugin.Sync.Server
         /// </summary>
         public bool SetMode(SyncServiceMode mode)
         {
-            if (this.Mode == mode) return false;
-            
-            switch (mode)
+            lock (this.locker)
             {
-                case SyncServiceMode.Idle:
-                    this.poll.SetState(false);
-                    this.push.SetState(false);
-                    break;
-                case SyncServiceMode.Poll:
-                    this.poll.SetState(true);
-                    this.push.SetState(false);
-                    break;
-                case SyncServiceMode.Push:
-                    this.poll.SetState(false);
-                    this.push.SetState(true);
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
-            }
+                if (this.Mode == mode) return false;
+            
+                switch (mode)
+                {
+                    case SyncServiceMode.Idle:
+                        this.poll.SetState(false);
+                        this.push.SetState(false);
+                        break;
+                    case SyncServiceMode.Poll:
+                        this.poll.SetState(true);
+                        this.push.SetState(false);
+                        break;
+                    case SyncServiceMode.Push:
+                        this.poll.SetState(false);
+                        this.push.SetState(true);
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
+                }
 
-            this.Mode = mode;
-            return true;
+                this.Mode = mode;
+                return true;
+            }
         }
 
         public void PushMonster(Monster monster, int index) => this.push.PushMonster(monster, index);

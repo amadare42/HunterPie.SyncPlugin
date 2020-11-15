@@ -12,21 +12,29 @@ namespace Plugin.Sync.Server
     {
         public string SessionId { get; set; }
 
+        /// <summary>
+        /// Should be used for polled monster synchronization.
+        /// </summary>
         private readonly SemaphoreSlim semaphore = new SemaphoreSlim(1);
         private List<MonsterModel> polledMonsters = CreateDefaultMonstersCollection();
-        private readonly SyncServerClient client = new SyncServerClient();
-        private Thread thread;
-        
-        private CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
 
+        private readonly SyncServerClient client = new SyncServerClient();
+
+        private Thread thread;
+        private CancellationTokenSource cancellationTokenSource;
+
+        /// <summary>
+        /// NOTE: This is not thread-safe.
+        /// </summary>
         public void SetState(bool state)
         {
-            var isRunning = this.thread?.IsAlive ?? false;
+            var isRunning = this.cancellationTokenSource != null &&
+                            !this.cancellationTokenSource.IsCancellationRequested;
             // same state, don't do anything
-            if (isRunning == state) return;
+            if (state == isRunning) return;
             if (state)
             {
-                this.cancellationTokenSource.Cancel();
+                this.cancellationTokenSource?.Cancel();
                 this.cancellationTokenSource = new CancellationTokenSource();
                 var cancelToken = this.cancellationTokenSource.Token;
                 var scanRef = new ThreadStart(() => PollLoop(cancelToken));
@@ -35,7 +43,7 @@ namespace Plugin.Sync.Server
             }
             else
             {
-                this.cancellationTokenSource.Cancel();
+                this.cancellationTokenSource?.Cancel();
                 this.semaphore.Wait();
                 this.polledMonsters = CreateDefaultMonstersCollection();
                 this.semaphore.Release();
@@ -55,29 +63,25 @@ namespace Plugin.Sync.Server
             var pollId = Guid.NewGuid().ToString();
             var retryCount = 0;
             var sw = new Stopwatch();
-            Logger.Trace($"Started new poll with '{pollId}'");
+            Logger.Debug($"Started new poll with '{pollId}'");
 
             while (true)
             {
-                if (token.IsCancellationRequested)
-                {
-                    Logger.Trace($"Poll with '{pollId}' closed.");
-                    return;
-                }
+                token.ThrowIfCancellationRequested();
                 
                 // wait for session id
                 if (string.IsNullOrEmpty(this.SessionId))
                 {
-                    await Task.Delay(500);
+                    await Task.Delay(500, token);
                     continue;
                 }
 
                 try
                 {
                     // throttling
-                    await Task.Delay(500);
+                    await Task.Delay(500, token);
                     sw.Restart();
-                    var changedMonsters = await this.client.PollMonsterChanges(this.SessionId, pollId);
+                    var changedMonsters = await this.client.PollMonsterChanges(this.SessionId, pollId, token);
                     if (changedMonsters == null)
                     {
                         Logger.Trace($"No monsters updates. ({sw.ElapsedMilliseconds} ms after request started)");
@@ -85,17 +89,31 @@ namespace Plugin.Sync.Server
                     }
 
                     UpdateMonsters(changedMonsters);
-                    Logger.Trace($"Monsters updated: {changedMonsters.Count} ({sw.ElapsedMilliseconds} ms after request started)");
+                    Logger.Trace(
+                        $"Monsters updated: {changedMonsters.Count} ({sw.ElapsedMilliseconds} ms after request started)");
                     if (retryCount != 0)
                     {
                         retryCount = 0;
                         Logger.Log("Connection restored");
                     }
                 }
+                catch (OperationCanceledException)
+                {
+                    Logger.Debug($"Poll with '{pollId}' closed.");
+                    return;
+                }
                 catch (Exception ex)
                 {
                     Logger.Error($"Error on polling changes. Waiting for 10 sec before retry ({retryCount++}/10). : {ex.Message}");
-                    await Task.Delay(10000);
+                    try
+                    {
+                        await Task.Delay(10000, token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        continue;
+                    }
+                    
                     if (retryCount == 10)
                     {
                         Logger.Log("Polling stopped - no monster data updates.");

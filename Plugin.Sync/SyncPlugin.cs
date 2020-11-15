@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using HunterPie.Core;
+using HunterPie.Core.Events;
 using HunterPie.Memory;
 using HunterPie.Plugins;
 using Plugin.Sync.Model;
@@ -41,6 +42,10 @@ namespace Plugin.Sync
             this.Context.Player.OnSessionChange += OnSessionChange;
             this.Context.Player.OnCharacterLogout += OnCharacterLogout;
             this.Context.Player.OnCharacterLogin += OnCharacterLogin;
+            foreach (var member in this.Context.Player.PlayerParty.Members)
+            {
+                member.OnSpawn += OnMemberSpawn;
+            }
 
             Task.Run(WaitForScan);
         }
@@ -51,37 +56,39 @@ namespace Plugin.Sync
             this.Context.Player.OnSessionChange -= OnSessionChange;
             this.Context.Player.OnCharacterLogout -= OnCharacterLogout;
             this.Context.Player.OnCharacterLogin -= OnCharacterLogin;
+            if (this.Context.Player.PlayerParty.Members != null)
+            {
+                foreach (var member in this.Context.Player.PlayerParty.Members)
+                {
+                    member.OnSpawn -= OnMemberSpawn;
+                }
+            }
+
             this.Context = null;
         }
 
         private void OnZoneChange(object source, EventArgs args)
         {
-            if (IsPartyLoaded())
+            if (string.IsNullOrEmpty(this.Context?.Player.SessionID) && !(this.Context?.Player.InPeaceZone ?? false))
+            {
+                Logger.Debug("Zone changed, but session id is missing. Wait for next event.");
+            } 
+            else
             {
                 UpdateSyncState("zone change");
             }
-            else if (string.IsNullOrEmpty(this.Context?.Player.SessionID))
-            {
-                Logger.Debug("Zone changed, but session is missing. Wait for next event.");
-            } 
-            else 
-            {
-                Logger.Log("Zone changed, waiting for party to load...");
-                // we need to have party loaded in order to determine if current player is host or not
-                // so if zone changed, but party still doesn't ready, waiting
-                Task.Run(WaitForPartyToLoad);
-            }
         }
-
+        
+        private void OnMemberSpawn(object source, PartyMemberEventArgs args) => UpdateSyncState($"{args.Name} spawn");
+        
         private void OnSessionChange(object source, EventArgs args) => UpdateSyncState("session change");
+        
         private void OnCharacterLogout(object source, EventArgs args) => UpdateSyncState("character logout");
+        
         private void OnCharacterLogin(object source, EventArgs args) => UpdateSyncState("character login");
-        private void OnPartyLoaded() => UpdateSyncState("party loaded");
 
         private bool IsLeader() => this.Context?.Player.PlayerParty.Members.Any(m => m.IsInParty && m.IsMe && m.IsPartyLeader) ?? false;
 
-        private bool IsPartyLoaded() => this.Context?.Player.PlayerParty.Members.Any(m => m.IsInParty) ?? false;
-        
         private const int TrainingAreaZoneId = 504;
 
         private bool IsGameInSyncableState() => !this.Context.Player.InPeaceZone
@@ -123,27 +130,11 @@ namespace Plugin.Sync
                 }
             }
         }
-
-        private async Task WaitForPartyToLoad()
-        {
-            // waiting for party members to load
-            while (this.Context != null && !IsPartyLoaded())
-            {
-                await Task.Delay(100);
-            }
-            
-            // to be absolutely sure everyone is loaded
-            await Task.Delay(100);
-
-            if (this.Context != null)
-            {
-                OnPartyLoaded();
-            }
-        }
-
+        
+        
+        /// Waiting for <see cref="Game.StartScanning"/> call to finish, so we can be sure that scan loops are started. 
         private async Task WaitForScan()
         {
-            // waiting for StartScanning call to finish
             while (this.Context != null && !this.Context.IsActive)
             {
                 await Task.Delay(500);
@@ -189,8 +180,6 @@ namespace Plugin.Sync
                         continue;
                     }
 
-                    // HACK
-                    UpdateSyncState("monster scan");
                     var isLeader = IsLeader();
                     if (isLeader)
                     {
@@ -238,6 +227,7 @@ namespace Plugin.Sync
             var parts = monsterModel.Parts;
             if (monster.Parts.Count == 0 || monster.Ailments.Count == 0)
             {
+                Logger.Trace("Monster isn't initialized, update skipped");
                 return;
             }
             

@@ -15,39 +15,38 @@ namespace Plugin.Sync.Server
     {
         public string SessionId { get; set; }
 
+        /// <summary>
+        /// Should be used for queue and cached monster synchronization.
+        /// </summary>
         private readonly object locker = new object();
+        
         private readonly ConcurrentDictionary<int, MonsterModel> cachedMonsters = new ConcurrentDictionary<int, MonsterModel>();
         private readonly List<MonsterModel> pushQueue = new List<MonsterModel>();
+        
         private readonly SyncServerClient client = new SyncServerClient();
+        
         private CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
         private Thread thread;
 
         public void SetState(bool state)
         {
-            var isRunning = this.thread?.IsAlive ?? false;
+            var isRunning = this.cancellationTokenSource != null &&
+                            !this.cancellationTokenSource.IsCancellationRequested;
             // same state, don't do anything
-            if (isRunning == state) return;
+            if (state == isRunning) return;
             if (state)
             {
-                this.cancellationTokenSource.Cancel();
+                this.cancellationTokenSource?.Cancel();
                 this.cancellationTokenSource = new CancellationTokenSource();
                 var scanRef = new ThreadStart(() => PushLoop(this.cancellationTokenSource.Token));
                 this.thread = new Thread(scanRef) {Name = "SyncPlugin_PushLoop"};
-                lock (this.locker)
-                {
-                    this.pushQueue.Clear();
-                    this.cachedMonsters.Clear();
-                }
+                ClearQueue();
                 this.thread.Start();
             }
             else
             {
-                this.cancellationTokenSource.Cancel();
-                lock (this.locker)
-                {
-                    this.pushQueue.Clear();
-                    this.cachedMonsters.Clear();
-                }
+                this.cancellationTokenSource?.Cancel();
+                ClearQueue();
             }
         }
 
@@ -89,15 +88,11 @@ namespace Plugin.Sync.Server
 
             while (true)
             {
-                if (token.IsCancellationRequested)
-                {
-                    Logger.Debug("Push loop stopped");
-                    return;
-                }
+                token.ThrowIfCancellationRequested();
                 
                 if (string.IsNullOrEmpty(this.SessionId))
                 {
-                    await Task.Delay(50);
+                    await Task.Delay(50, token);
                     continue;
                 }
 
@@ -118,31 +113,53 @@ namespace Plugin.Sync.Server
                     // wait for changes to appear
                     if (!monsters.Any())
                     {
-                        await Task.Delay(50);
+                        await Task.Delay(50, token);
                         continue;
                     }
 
-                    await this.client.PushChangedMonsters(this.SessionId, monsters);
-                    Util.Logger.Trace($"PUSH monsters: {monsters.Count} ({sw.ElapsedMilliseconds} ms from last push)");
+                    await this.client.PushChangedMonsters(this.SessionId, monsters, token);
+                    Logger.Trace($"PUSH monsters: {monsters.Count} ({sw.ElapsedMilliseconds} ms from last push)");
                     sw.Restart();
                     if (retryCount != 0)
                     {
                         retryCount = 0;
-                        Util.Logger.Log("Connection restored");
+                        Logger.Log("Connection restored");
                     }
                     // throttling
-                    await Task.Delay(300);
+                    await Task.Delay(300, token);
+                }
+                catch (OperationCanceledException)
+                {
+                    Logger.Debug("Push thread stopped.");
+                    return;
                 }
                 catch (Exception ex)
                 {
-                    Util.Logger.Error($"Error on pushing monsters to server. Will retry after 10 sec when new data is available ({retryCount++}/10): {ex.Message}");
-                    await Task.Delay(10000);
+                    Logger.Error($"Error on pushing monsters to server. Will retry after 10 sec when new data is available ({retryCount++}/10): {ex.Message}");
+                    try
+                    {
+                        await Task.Delay(10000, token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        continue;
+                    }
+
                     if (retryCount == 10)
                     {
-                        Util.Logger.Log("Pushing stopped - no monster data for other members.");
+                        Logger.Log("Pushing stopped - no monster data for other members.");
                         return;
                     }
                 }
+            }
+        }
+
+        private void ClearQueue()
+        {
+            lock (this.locker)
+            {
+                this.pushQueue.Clear();
+                this.cachedMonsters.Clear();
             }
         }
 
