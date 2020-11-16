@@ -25,7 +25,7 @@ namespace Plugin.Sync.Server
         
         private readonly SyncServerClient client = new SyncServerClient();
         
-        private CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+        private CancellationTokenSource cancellationTokenSource;
         private Thread thread;
 
         public void SetState(bool state)
@@ -48,7 +48,7 @@ namespace Plugin.Sync.Server
             {
                 this.cancellationTokenSource?.Cancel();
                 ClearQueue();
-                // this.thread?.Join();
+                this.thread?.Join();
             }
             Logger.Trace($"PushService.SetState -> changed");
         }
