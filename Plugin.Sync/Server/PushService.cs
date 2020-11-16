@@ -48,7 +48,7 @@ namespace Plugin.Sync.Server
             {
                 this.cancellationTokenSource?.Cancel();
                 ClearQueue();
-                this.thread.Join();
+                // this.thread?.Join();
             }
             Logger.Trace($"PushService.SetState -> changed");
         }

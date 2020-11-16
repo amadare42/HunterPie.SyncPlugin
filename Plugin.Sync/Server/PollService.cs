@@ -48,7 +48,7 @@ namespace Plugin.Sync.Server
                 this.semaphore.Wait();
                 this.polledMonsters = CreateDefaultMonstersCollection();
                 this.semaphore.Release();
-                this.thread.Join();
+                // this.thread?.Join();
             }
             Logger.Trace("PollService.SetState -> changed");
         }
