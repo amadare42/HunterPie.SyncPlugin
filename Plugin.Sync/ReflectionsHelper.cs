@@ -104,6 +104,12 @@ namespace Plugin.Sync
             };
         }
 
+        public static void StopMonsterThread(Monster monster)
+        {
+            typeof(Monster).GetMethod("StopThread", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(monster, new object[0]);
+        }
+
         /// <summary>
         /// Creates delegate that call private method with provided name on Monster type.
         /// </summary>

@@ -159,7 +159,7 @@ namespace Plugin.Sync
 
         private void UpdateMonsterScan(Monster monster, int index)
         {
-            monster.StopThread();
+            ReflectionsHelper.StopMonsterThread(monster);
             var action = CreateMonsterScanFn(monster, index);
             var scanRef = new ThreadStart(action);
             var scan = new Thread(scanRef) {Name = $"SyncPlugin_Monster.{monster.MonsterNumber}"};
