@@ -106,7 +106,7 @@ namespace Plugin.Sync
 
         public static void StopMonsterThread(Monster monster)
         {
-            typeof(Monster).GetMethod("StopThread", BindingFlags.Instance | BindingFlags.NonPublic)
+            typeof(Monster).GetMethod("StopThread", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
                 .Invoke(monster, new object[0]);
         }
 
