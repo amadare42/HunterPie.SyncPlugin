@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Plugin.Sync.Model;
@@ -16,7 +17,7 @@ namespace Plugin.Sync.Server
         /// Should be used for polled monster synchronization.
         /// </summary>
         private readonly SemaphoreSlim semaphore = new SemaphoreSlim(1);
-        private List<MonsterModel> polledMonsters = CreateDefaultMonstersCollection();
+        private readonly List<MonsterModel> polledMonsters = new List<MonsterModel>();
 
         private readonly SyncServerClient client = new SyncServerClient();
 
@@ -46,7 +47,7 @@ namespace Plugin.Sync.Server
             {
                 this.cancellationTokenSource?.Cancel();
                 this.semaphore.Wait();
-                this.polledMonsters = CreateDefaultMonstersCollection();
+                this.polledMonsters.Clear();
                 this.semaphore.Release();
                 this.thread?.Join();
             }
@@ -114,6 +115,7 @@ namespace Plugin.Sync.Server
                     }
                     catch (OperationCanceledException)
                     {
+                        // not using return, so main catch clause for cancelled operation will be executed
                         continue;
                     }
                     
@@ -126,17 +128,21 @@ namespace Plugin.Sync.Server
             }
         }
 
-        private static List<MonsterModel> CreateDefaultMonstersCollection() => new List<MonsterModel>
-        {
-            new MonsterModel {Index = 0}, new MonsterModel {Index = 1}, new MonsterModel {Index = 2},
-        };
-
         private void UpdateMonsters(List<MonsterModel> monsters)
         {
-            using var borrow = BorrowMonsters(); 
-            foreach (var monsterModel in monsters)
+            using var borrow = BorrowMonsters();
+            
+            foreach (var upd in monsters)
             {
-                this.polledMonsters[monsterModel.Index] = monsterModel;
+                var existingMonster = this.polledMonsters.FirstOrDefault(m => m.Id == upd.Id);
+                if (existingMonster == null)
+                {
+                    this.polledMonsters.Add(upd);
+                }
+                else
+                {
+                    existingMonster.UpdateWith(upd);
+                }
             }
         }
     }

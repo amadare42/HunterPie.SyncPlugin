@@ -113,10 +113,10 @@ namespace Plugin.Sync
                 if (this.syncService.SetMode(SyncServiceMode.Push))
                 {
                     // if became leader, push all monsters
-                    for (var index = 0; index < this.Context.Monsters.Length; index++)
+                    foreach (var monster in this.Context.Monsters)
                     {
-                        var contextMonster = this.Context.Monsters[index];
-                        this.syncService.PushMonster(contextMonster, index);
+                        var monsterModel = MapMonster(monster);
+                        this.syncService.PushMonster(monsterModel);
                     }
 
                     Logger.Log($"SyncState: Push [{trigger}]");
@@ -148,19 +148,18 @@ namespace Plugin.Sync
 
         private void OnScanStarted()
         {
-            for (var index = 0; index < this.Context.Monsters.Length; index++)
+            foreach (var monster in this.Context.Monsters)
             {
-                var monster = this.Context.Monsters[index];
-                UpdateMonsterScan(monster, index);
+                UpdateMonsterScan(monster);
             }
 
             Logger.Log("Replaced monster polling routine");
         }
 
-        private void UpdateMonsterScan(Monster monster, int index)
+        private void UpdateMonsterScan(Monster monster)
         {
             ReflectionsHelper.StopMonsterThread(monster);
-            var action = CreateMonsterScanFn(monster, index);
+            var action = CreateMonsterScanFn(monster);
             var scanRef = new ThreadStart(action);
             var scan = new Thread(scanRef) {Name = $"SyncPlugin_Monster.{monster.MonsterNumber}"};
             ReflectionsHelper.UpdateMonsterScanRefs(monster, scanRef, scan);
@@ -168,7 +167,7 @@ namespace Plugin.Sync
             scan.Start();
         }
 
-        private Action CreateMonsterScanFn(Monster monster, int index)
+        private Action CreateMonsterScanFn(Monster monster)
         {
             void MonsterScan()
             {
@@ -188,7 +187,8 @@ namespace Plugin.Sync
                             && !string.IsNullOrEmpty(monster.Id)
                             && IsGameInSyncableState())
                         {
-                            this.syncService.PushMonster(monster, index);
+                            var monsterModel = MapMonster(monster);
+                            this.syncService.PushMonster(monsterModel);
                         }
                     }
                     else
@@ -224,42 +224,46 @@ namespace Plugin.Sync
 
         private void UpdateFromMonsterModel(Monster monster, MonsterModel monsterModel)
         {
-            var parts = monsterModel.Parts;
-            if (monster.Parts.Count == 0 || monster.Ailments.Count == 0)
+            var parts = monster.Parts;
+            var updatedParts = monsterModel.Parts;
+            var ailments = monster.Ailments;
+            var updatedAilments = monsterModel.Ailments;
+            
+            if (parts.Count == 0 || ailments.Count == 0)
             {
                 Logger.Trace("Monster isn't initialized, update skipped");
                 return;
             }
             
-            if (monster.Parts.Count == parts.Count)
+            for (var i = 0; i < parts.Count; i++)
             {
-                for (var i = 0; i < parts.Count; i++)
-                {
-                    monster.Parts[i].SetPartInfo(parts[i].ToDomain());
-                    monster.Parts[i].IsRemovable = parts[i].IsRemovable;
-                    this.UpdateTenderizePart(monster.Parts[i], parts[i]);
-                }
+                var upd = updatedParts.FirstOrDefault(p => p.Index == i);
+                if (upd == null) continue;
+                
+                parts[i].SetPartInfo(upd.ToDomain());
+                monster.Parts[i].IsRemovable = upd.IsRemovable;
+                this.UpdateTenderizePart(monster.Parts[i], upd);
             }
-            else
+            
+            for (var i = 0; i < ailments.Count; i++)
             {
-                Logger.Trace($"Parts count mismatch. ({monster.Parts.Count} != {parts.Count})");
+                var upd = updatedAilments.FirstOrDefault(p => p.Index == i);
+                if (upd == null) continue;
+                
+                // TODO: ailments timers should not be synced, since peer member's game keep track of it
+                // this is here because GetMonsterAilments is disabled, so all ailment data must be sourced from somewhere
+                monster.Ailments[i].SetAilmentInfo(upd.ToDomain());
             }
-
-            if (monster.Ailments.Count == monsterModel.Ailments.Count)
+        }
+        
+        private static MonsterModel MapMonster(Monster monster)
+        {
+            return new MonsterModel
             {
-                for (var index = 0; index < monsterModel.Ailments.Count; index++)
-                {
-                    var ailmentModel = monsterModel.Ailments[index];
-                    var ailment = monster.Ailments[index];
-                    // TODO: ailments timers should not be synced, since peer member's game keep track of it
-                    // this is here because GetMonsterAilments is disabled, so all ailment data must be sourced from somewhere
-                    ailment.SetAilmentInfo(ailmentModel.ToDomain());
-                }
-            }
-            else
-            {
-                Logger.Trace($"Ailments count mismatch! ({monster.Ailments.Count} != {monsterModel.Ailments.Count})");
-            }
+                Id = monster.Id,
+                Parts = monster.Parts.Select(MonsterPartModel.FromDomain).ToList(),
+                Ailments = monster.Ailments.Select(AilmentModel.FromDomain).ToList()
+            };
         }
     }
 }

@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using HunterPie.Core;
 using Plugin.Sync.Model;
 using Plugin.Sync.Util;
 
@@ -20,13 +19,15 @@ namespace Plugin.Sync.Server
         /// </summary>
         private readonly object locker = new object();
         
-        private readonly ConcurrentDictionary<int, MonsterModel> cachedMonsters = new ConcurrentDictionary<int, MonsterModel>();
+        private readonly ConcurrentDictionary<string, MonsterModel> cachedMonsters = new ConcurrentDictionary<string, MonsterModel>();
         private readonly List<MonsterModel> pushQueue = new List<MonsterModel>();
         
         private readonly SyncServerClient client = new SyncServerClient();
         
         private CancellationTokenSource cancellationTokenSource;
         private Thread thread;
+        
+        private readonly DiffModelGenerator diffModelGenerator = new DiffModelGenerator();
 
         public void SetState(bool state)
         {
@@ -41,27 +42,16 @@ namespace Plugin.Sync.Server
                 this.cancellationTokenSource = new CancellationTokenSource();
                 var scanRef = new ThreadStart(() => PushLoop(this.cancellationTokenSource.Token));
                 this.thread = new Thread(scanRef) {Name = "SyncPlugin_PushLoop"};
-                ClearQueue();
+                ClearData();
                 this.thread.Start();
             }
             else
             {
                 this.cancellationTokenSource?.Cancel();
-                ClearQueue();
+                ClearData();
                 this.thread?.Join();
             }
-            Logger.Trace($"PushService.SetState -> changed");
-        }
-
-        public void PushMonster(Monster monster, int index)
-        {
-            if (string.IsNullOrEmpty(this.SessionId))
-            {
-                return;
-            }
-
-            var mappedMonster = MapMonster(monster, index);
-            PushMonster(mappedMonster);
+            Logger.Trace("PushService.SetState -> changed");
         }
 
         public void PushMonster(MonsterModel model)
@@ -71,15 +61,20 @@ namespace Plugin.Sync.Server
                 return;
             }
 
+            if (string.IsNullOrEmpty(model.Id))
+            {
+                Logger.Trace("Monster id is empty");
+                return;
+            }
+
             lock (this.locker)
             {
-                if (this.cachedMonsters.TryGetValue(model.Index, out var existingMonster) && existingMonster.Equals(model))
+                if (this.cachedMonsters.TryGetValue(model.Id, out var existingMonster) && existingMonster.Equals(model))
                 {
                     return;
                 }
 
-                // TODO: diffing
-                this.cachedMonsters[model.Index] = model;
+                this.cachedMonsters[model.Id] = model;
                 this.pushQueue.Add(model);
             }
         }
@@ -101,17 +96,7 @@ namespace Plugin.Sync.Server
 
                 try
                 {
-                    List<MonsterModel> monsters;
-
-                    lock (this.locker)
-                    {
-                        monsters = this.pushQueue
-                            .GroupBy(m => m.Index)
-                            .Select(g => g.Last())
-                            .OrderBy(m => m.Index)
-                            .ToList();
-                        this.pushQueue.Clear();
-                    }
+                    var monsters = ConsumeQueue();
 
                     // wait for changes to appear
                     if (!monsters.Any())
@@ -120,8 +105,9 @@ namespace Plugin.Sync.Server
                         continue;
                     }
 
-                    await this.client.PushChangedMonsters(this.SessionId, monsters, token);
-                    Logger.Trace($"PUSH monsters: {monsters.Count} ({sw.ElapsedMilliseconds} ms from last push)");
+                    var monsterDiffs = this.diffModelGenerator.GetDiffs(monsters);
+                    await this.client.PushChangedMonsters(this.SessionId, monsterDiffs, token);
+                    Logger.Trace($"PUSH [{GetTraceData(monsterDiffs)}] ({sw.ElapsedMilliseconds} ms from last push)");
                     sw.Restart();
                     if (retryCount != 0)
                     {
@@ -145,6 +131,7 @@ namespace Plugin.Sync.Server
                     }
                     catch (OperationCanceledException)
                     {
+                        // not using return, so main catch clause for cancelled operation will be executed
                         continue;
                     }
 
@@ -157,24 +144,32 @@ namespace Plugin.Sync.Server
             }
         }
 
-        private void ClearQueue()
+        /// <summary>
+        /// Clear queue and normalize to get only latest monster updates
+        /// </summary>
+        private List<MonsterModel> ConsumeQueue()
+        {
+            lock (this.locker)
+            {
+                var monsters = this.pushQueue
+                    .GroupBy(m => m.Id)
+                    .Select(g => g.Last())
+                    .ToList();
+                this.pushQueue.Clear();
+                return monsters;
+            }
+        }
+
+        private static string GetTraceData(List<MonsterModel> models) => $"monsters: {models.Count}; parts: {models.Sum(m => m.Parts.Count)}; ailments: {models.Sum(m => m.Ailments.Count)}";
+
+        private void ClearData()
         {
             lock (this.locker)
             {
                 this.pushQueue.Clear();
                 this.cachedMonsters.Clear();
+                this.diffModelGenerator.Clear();
             }
-        }
-
-        private static MonsterModel MapMonster(Monster monster, int index)
-        {
-            return new MonsterModel
-            {
-                Id = monster.Id,
-                Index = index,
-                Parts = monster.Parts.Select(MonsterPartModel.FromDomain).ToList(),
-                Ailments = monster.Ailments.Select(AilmentModel.FromDomain).ToList()
-            };
         }
     }
 }

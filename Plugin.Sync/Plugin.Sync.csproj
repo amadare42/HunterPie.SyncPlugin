@@ -55,6 +55,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Server\DiffModelGenerator.cs" />
     <Compile Include="SyncPlugin.cs" />
     <Compile Include="ConfigService.cs" />
     <Compile Include="Model\AilmentModel.cs" />

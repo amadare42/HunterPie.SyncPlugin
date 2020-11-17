@@ -6,13 +6,15 @@ namespace Plugin.Sync.Model
 {
     public class AilmentModel : IEquatable<AilmentModel>
     {
+        public int Index { get; set; }
+        
         public float MaxDuration { get; set; }
         public float Duration { get; set; }
 
         public float MaxBuildup { get; set; }
         public float Buildup { get; set; }
         public uint Counter { get; set; }
-
+        
         public sMonsterAilment ToDomain() => new sMonsterAilment
         {
             MaxBuildup = this.MaxBuildup,
@@ -21,8 +23,9 @@ namespace Plugin.Sync.Model
             Counter = this.Counter
         };
 
-        public static AilmentModel FromDomain(Ailment a) => new AilmentModel
+        public static AilmentModel FromDomain(Ailment a, int ailmentIndex) => new AilmentModel
         {
+            Index = ailmentIndex,
             Buildup = a.Buildup,
             MaxBuildup = a.MaxBuildup,
             Counter = a.Counter,
@@ -43,9 +46,12 @@ namespace Plugin.Sync.Model
             }
 
             return this.MaxDuration.Equals(other.MaxDuration)
+                   && this.Index == other.Index
                    // TODO: dirty solution
                    && Math.Abs((int)(this.Duration - other.Duration)) < 0.9
-                   && this.MaxBuildup.Equals(other.MaxBuildup) && this.Buildup.Equals(other.Buildup) && this.Counter == other.Counter;
+                   && this.MaxBuildup.Equals(other.MaxBuildup) 
+                   && this.Buildup.Equals(other.Buildup) 
+                   && this.Counter == other.Counter;
         }
 
         public override bool Equals(object obj)
@@ -77,6 +83,7 @@ namespace Plugin.Sync.Model
                 hashCode = (hashCode * 397) ^ this.MaxBuildup.GetHashCode();
                 hashCode = (hashCode * 397) ^ this.Buildup.GetHashCode();
                 hashCode = (hashCode * 397) ^ (int) this.Counter;
+                hashCode = (hashCode * 397) ^ this.Index;
                 return hashCode;
             }
         }
@@ -85,6 +92,7 @@ namespace Plugin.Sync.Model
         {
             return new AilmentModel
             {
+                Index = this.Index,
                 Buildup = this.Buildup,
                 Counter = this.Counter,
                 Duration = this.Duration,

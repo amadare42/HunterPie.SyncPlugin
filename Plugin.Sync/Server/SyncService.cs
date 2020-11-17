@@ -51,8 +51,6 @@ namespace Plugin.Sync.Server
             }
         }
 
-        public void PushMonster(Monster monster, int index) => this.push.PushMonster(monster, index);
-
         public void PushMonster(MonsterModel model) => this.push.PushMonster(model);
 
         /// <summary>

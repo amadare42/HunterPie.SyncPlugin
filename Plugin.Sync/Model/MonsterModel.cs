@@ -8,16 +8,32 @@ namespace Plugin.Sync.Model
     public class MonsterModel : IEquatable<MonsterModel>
     {
         public string Id { get; set; }
-        public int Index { get; set; }
         public List<MonsterPartModel> Parts { get; set; } = new List<MonsterPartModel>();
         public List<AilmentModel> Ailments { get; set; } = new List<AilmentModel>();
+        
+        public void UpdateWith(MonsterModel model)
+        {
+            var maxAilmentIdx = Math.Max(model.Ailments.Max(a => a.Index), this.Ailments.Max(a => a.Index));
+            var maxPartIdx = Math.Max(model.Parts.Max(a => a.Index), this.Parts.Max(a => a.Index));
+            
+            this.Id = model.Id;
+            this.Ailments = Enumerable.Range(0, maxAilmentIdx + 1)
+                .Select(i =>
+                    model.Ailments.FirstOrDefault(a => a.Index == i) ?? this.Ailments.FirstOrDefault(a => a.Index == i))
+                .Where(e => e != null)
+                .ToList();
+            this.Parts = Enumerable.Range(0, maxPartIdx + 1)
+                .Select(i =>
+                    model.Parts.FirstOrDefault(a => a.Index == i) ?? this.Parts.FirstOrDefault(a => a.Index == i))
+                .Where(e => e != null)
+                .ToList();
+        }
 
         public MonsterModel Clone()
         {
             return new MonsterModel
             {
                 Id = this.Id,
-                Index = this.Index,
                 Parts = this.Parts.Select(p => p.Clone()).ToList(),
                 Ailments = this.Ailments.Select(a => a.Clone()).ToList()
             };
@@ -35,7 +51,7 @@ namespace Plugin.Sync.Model
                 return true;
             }
 
-            return this.Id == other.Id && this.Index == other.Index && this.Parts.AreEqual(other.Parts) && this.Ailments.AreEqual(other.Ailments);
+            return this.Id == other.Id && this.Parts.AreEqual(other.Parts) && this.Ailments.AreEqual(other.Ailments);
         }
 
         public override bool Equals(object obj)
@@ -63,7 +79,6 @@ namespace Plugin.Sync.Model
             unchecked
             {
                 var hashCode = (this.Id != null ? this.Id.GetHashCode() : 0);
-                hashCode = (hashCode * 397) ^ this.Index;
                 hashCode = (hashCode * 397) ^ (this.Parts != null ? this.Parts.GetHashCode() : 0);
                 hashCode = (hashCode * 397) ^ (this.Ailments != null ? this.Ailments.GetHashCode() : 0);
                 return hashCode;

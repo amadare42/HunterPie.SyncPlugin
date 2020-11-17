@@ -6,6 +6,7 @@ namespace Plugin.Sync.Model
 {
     public class MonsterPartModel : IEquatable<MonsterPartModel>
     {
+        public int Index { get; set; }
         public float MaxHealth { get; set; }
         public float Health { get; set; }
         public int Counter { get; set; }
@@ -20,6 +21,7 @@ namespace Plugin.Sync.Model
         {
             return new MonsterPartModel
             {
+                Index = this.Index,
                 MaxHealth = this.MaxHealth,
                 Counter = this.Counter,
                 Health = this.Health,
@@ -36,8 +38,9 @@ namespace Plugin.Sync.Model
             Counter = this.Counter
         };
 
-        public static MonsterPartModel FromDomain(Part p) => new MonsterPartModel
+        public static MonsterPartModel FromDomain(Part p, int index) => new MonsterPartModel
         {
+            Index = index,
             Counter = p.BrokenCounter, 
             Health = p.Health,
             IsRemovable = p.IsRemovable, 
@@ -59,6 +62,7 @@ namespace Plugin.Sync.Model
             }
 
             return this.MaxHealth.Equals(other.MaxHealth) 
+                   && this.Index == other.Index 
                    && this.Health.Equals(other.Health) 
                    && this.Counter == other.Counter 
                    && this.IsRemovable == other.IsRemovable 
@@ -91,6 +95,7 @@ namespace Plugin.Sync.Model
             unchecked
             {
                 var hashCode = this.MaxHealth.GetHashCode();
+                hashCode = (hashCode * 397) ^ this.Index;
                 hashCode = (hashCode * 397) ^ this.Health.GetHashCode();
                 hashCode = (hashCode * 397) ^ this.Counter;
                 hashCode = (hashCode * 397) ^ this.IsRemovable.GetHashCode();

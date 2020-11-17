@@ -50,7 +50,7 @@ namespace Plugin.Sync
         {
             SyncServerClient.BaseUrl = config.ServerUrl;
             Logger.LogLevel = config.LogLevel;
-            Logger.Log($"Using server {Current.ServerUrl}; logs level is {Current.LogLevel:G}");
+            Logger.Log($"Using server {Current.ServerUrl}; logs level is {Current.LogLevel:G}; [Version: {typeof(ConfigService).Assembly.GetName().Version}]");
         }
     }
 }
