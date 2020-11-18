@@ -34,6 +34,9 @@
     <WarningLevel>4</WarningLevel>
     <Prefer32bit>true</Prefer32bit>
   </PropertyGroup>
+  <PropertyGroup>
+    <RunPostBuildEvent>Always</RunPostBuildEvent>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="HunterPie, Culture=neutral, PublicKeyToken=null">
       <HintPath>..\..\HunterPie\HunterPie\bin\Debug\HunterPie.exe</HintPath>
@@ -55,6 +58,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="LinqExtensions.cs" />
     <Compile Include="Server\DiffModelGenerator.cs" />
     <Compile Include="SyncPlugin.cs" />
     <Compile Include="ConfigService.cs" />
@@ -79,10 +83,13 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>set modulePath="$(ProjectDir)..\..\HunterPie\HunterPie\bin\$(ConfigurationName)\Modules\$(ProjectName)"
+    <PostBuildEvent>powershell.exe -ExecutionPolicy Bypass "$(ProjectDir)build\PostBuild.ps1" -root '$(TargetDir)'
+if not %errorlevel% == 0 exit %errorlevel%
+set modulePath="$(ProjectDir)..\..\HunterPie\HunterPie\bin\$(ConfigurationName)\Modules\$(ProjectName)"
 if not exist "%modulePath%" mkdir %modulePath%
 copy $(TargetDir)$(TargetFileName) "%modulePath%\$(TargetFileName)"
-copy $(TargetDir)module.json "%modulePath%\module.json"</PostBuildEvent>
+copy $(TargetDir)module.json "%modulePath%\module.json"
+    </PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

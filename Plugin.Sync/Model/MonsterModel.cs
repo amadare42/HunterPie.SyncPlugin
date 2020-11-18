@@ -13,8 +13,8 @@ namespace Plugin.Sync.Model
         
         public void UpdateWith(MonsterModel model)
         {
-            var maxAilmentIdx = Math.Max(model.Ailments.Max(a => a.Index), this.Ailments.Max(a => a.Index));
-            var maxPartIdx = Math.Max(model.Parts.Max(a => a.Index), this.Parts.Max(a => a.Index));
+            var maxAilmentIdx = Math.Max(model.Ailments.MaxOrDefault(a => a.Index), this.Ailments.MaxOrDefault(a => a.Index));
+            var maxPartIdx = Math.Max(model.Parts.MaxOrDefault(a => a.Index), this.Parts.MaxOrDefault(a => a.Index));
             
             this.Id = model.Id;
             this.Ailments = Enumerable.Range(0, maxAilmentIdx + 1)
