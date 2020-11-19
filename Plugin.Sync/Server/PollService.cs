@@ -83,7 +83,7 @@ namespace Plugin.Sync.Server
                 try
                 {
                     // throttling
-                    await Task.Delay(500, token);
+                    await Task.Delay(250, token);
                     sw.Restart();
                     var changedMonsters = await this.client.PollMonsterChanges(this.SessionId, pollId, token);
                     if (changedMonsters == null)
