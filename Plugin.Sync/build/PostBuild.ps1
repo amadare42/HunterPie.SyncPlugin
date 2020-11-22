@@ -20,15 +20,22 @@ function Get-BranchName() {
     }
 }
 
+function Get-Version($path) {
+    return (Get-ChildItem -Path $path).VersionInfo.FileVersion
+}
+
 function Update-ModuleJson() {
     Set-Location -Path $root
-    $version = (Get-ChildItem -Path "Plugin.Sync.dll").VersionInfo.FileVersion
+    $version = Get-Version("Plugin.Sync.dll")
     $branchName = Get-BranchName
 
-    (Get-Content module.json).`
-        Replace('$VERSION$', $version).`
-        Replace('$BRANCH$', $branchName) |
-        Set-Content module.json
+    $content = (Get-Content module.json).`
+        Replace('$BRANCH$', $branchName)
+    $content =  $content | % { [Regex]::Replace($_, '\$version:([^$]+)\$', { Get-Version $args[0].Groups[1] }) }
+    $content =  $content | % { [Regex]::Replace($_, '\$hash:([^$]+)\$', { $(Get-FileHash $args[0].Groups[1]).Hash }) }
+
+    Set-Content module.json $content
+
     Write-Host "Updated module.json > Version: $version; Branch: $branchName"
 }
 

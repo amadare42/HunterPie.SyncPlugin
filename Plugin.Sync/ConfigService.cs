@@ -2,7 +2,7 @@
 using System.IO;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
-using Plugin.Sync.Server;
+using Plugin.Sync.Connectivity;
 using Plugin.Sync.Util;
 
 namespace Plugin.Sync
@@ -10,7 +10,7 @@ namespace Plugin.Sync
     public class Config
     {
         public LogLevel LogLevel { get; set; } = LogLevel.Info;
-        public string ServerUrl { get; set; } = "https://amadare-mhw-sync.herokuapp.com";
+        public string ServerUrl { get; set; } = "https://amadare-mhw-sync.herokuapp.com/dev";
     }
 
     public static class ConfigService
@@ -48,7 +48,6 @@ namespace Plugin.Sync
 
         public static void Apply(Config config)
         {
-            SyncServerClient.BaseUrl = config.ServerUrl;
             Logger.LogLevel = config.LogLevel;
             Logger.Log($"Using server {Current.ServerUrl}; logs level is {Current.LogLevel:G}; [Version: {typeof(ConfigService).Assembly.GetName().Version}]");
         }

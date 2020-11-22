@@ -7,7 +7,7 @@ using HunterPie.Core.Events;
 using HunterPie.Memory;
 using HunterPie.Plugins;
 using Plugin.Sync.Model;
-using Plugin.Sync.Server;
+using Plugin.Sync.Services;
 using Plugin.Sync.Util;
 
 namespace Plugin.Sync
@@ -73,6 +73,10 @@ namespace Plugin.Sync
             {
                 Logger.Debug("Zone changed, but session id is missing. Wait for next event.");
             } 
+            else if (this.Context?.Player.PlayerParty.Members.All(m => !m.IsInParty) ?? true)
+            {
+                Logger.Debug("Zone changed, but party is not loaded yet. Wait for next event.");
+            }
             else
             {
                 UpdateSyncState("zone change");
@@ -214,12 +218,13 @@ namespace Plugin.Sync
         {
             using var monstersBorrow = this.syncService.BorrowMonsters();
             var monsterModel = monstersBorrow.Value.FirstOrDefault(m => m.Id == monster.Id);
-            if (monsterModel == null)
+            if (monsterModel != null)
             {
-                return;
+                UpdateFromMonsterModel(monster, monsterModel);
             }
-
-            UpdateFromMonsterModel(monster, monsterModel);
+            
+            // we don't need to process same updates again, so we can clear them
+            monstersBorrow.Value.Clear();
         }
 
         private void UpdateFromMonsterModel(Monster monster, MonsterModel monsterModel)

@@ -58,8 +58,18 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Connectivity\BaseMessageHandler.cs" />
+    <Compile Include="Connectivity\EventMessageHandler.cs" />
+    <Compile Include="Connectivity\IMessageEncoder.cs" />
+    <Compile Include="Connectivity\IMessageHandler.cs" />
+    <Compile Include="Connectivity\JsonMessageEncoder.cs" />
+    <Compile Include="Connectivity\DomainWebsocketClient.cs" />
+    <Compile Include="Connectivity\NullMessageHandler.cs" />
+    <Compile Include="Connectivity\QueuedMessageHandler.cs" />
+    <Compile Include="Connectivity\WebsocketConnectionFailedException.cs" />
     <Compile Include="LinqExtensions.cs" />
-    <Compile Include="Server\DiffModelGenerator.cs" />
+    <Compile Include="Model\PushMonstersDto.cs" />
+    <Compile Include="Services\DiffModelGenerator.cs" />
     <Compile Include="SyncPlugin.cs" />
     <Compile Include="ConfigService.cs" />
     <Compile Include="Model\AilmentModel.cs" />
@@ -67,12 +77,13 @@
     <Compile Include="Model\MonsterPartModel.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ReflectionsHelper.cs" />
-    <Compile Include="Server\PollService.cs" />
-    <Compile Include="Server\PushService.cs" />
-    <Compile Include="Server\SyncServerClient.cs" />
-    <Compile Include="Server\SyncService.cs" />
-    <Compile Include="Server\SyncServiceMode.cs" />
+    <Compile Include="Services\PollService.cs" />
+    <Compile Include="Services\PushService.cs" />
+    <Compile Include="Services\SyncService.cs" />
+    <Compile Include="Services\SyncServiceMode.cs" />
     <Compile Include="Util\Borrow.cs" />
+    <Compile Include="Util\LimitFloatPrecisionConverter.cs" />
+    <Compile Include="Util\ListCompactionConverter.cs" />
     <Compile Include="Util\ListComparator.cs" />
     <Compile Include="Util\Logger.cs" />
   </ItemGroup>
@@ -81,6 +92,10 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="deniszykov.WebSocketListener" Version="4.2.10" />
+    <PackageReference Include="Stateless" Version="5.1.5" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>powershell.exe -ExecutionPolicy Bypass "$(ProjectDir)build\PostBuild.ps1" -root '$(TargetDir)'
@@ -88,6 +103,8 @@ if not %errorlevel% == 0 exit %errorlevel%
 set modulePath="$(ProjectDir)..\..\HunterPie\HunterPie\bin\$(ConfigurationName)\Modules\$(ProjectName)"
 if not exist "%modulePath%" mkdir %modulePath%
 copy $(TargetDir)$(TargetFileName) "%modulePath%\$(TargetFileName)"
+copy $(TargetDir)deniszykov.WebSocketListener.dll "%modulePath%\deniszykov.WebSocketListener.dll"
+copy $(TargetDir)Stateless.dll "%modulePath%\Stateless.dll"
 copy $(TargetDir)module.json "%modulePath%\module.json"
     </PostBuildEvent>
   </PropertyGroup>

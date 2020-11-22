@@ -1,6 +1,8 @@
 ﻿using System;
+using System.IO;
 using HunterPie.Core;
 using HunterPie.Core.Definitions;
+using Microsoft.SqlServer.Server;
 
 namespace Plugin.Sync.Model
 {

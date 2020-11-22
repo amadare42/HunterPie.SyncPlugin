@@ -2,8 +2,11 @@
 using System.Linq;
 using Plugin.Sync.Model;
 
-namespace Plugin.Sync.Server
+namespace Plugin.Sync.Services
 {
+    /// <summary>
+    /// Stateful service that will generate models that only contains differences between latest and provided models.
+    /// </summary>
     public class DiffModelGenerator
     {
         private readonly List<MonsterModel> state = new List<MonsterModel>();

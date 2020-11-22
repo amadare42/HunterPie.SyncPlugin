@@ -48,6 +48,7 @@ namespace Plugin.Sync.Util
     {
         public void Log(string message, LogLevel level)
         {
+            var prevColor = Console.ForegroundColor;
             Console.ForegroundColor = level switch
             {
                 LogLevel.Error => ConsoleColor.Red,
@@ -56,6 +57,7 @@ namespace Plugin.Sync.Util
                 _ => ConsoleColor.White
             };
             Console.WriteLine($"{DateTime.Now:HH:mm:ss:ffff} [{level:G}] {message}");
+            Console.ForegroundColor = prevColor;
         }
 
     }
@@ -68,7 +70,8 @@ namespace Plugin.Sync.Util
 
         public static ILoggerTarget Target = new HunterPieDebugger();
 
-        public static void Log(string message) => Write($"{Prefix} {message}", LogLevel.Info);
+        public static void Log(string message, LogLevel level = LogLevel.Info) => Write($"{Prefix} {message}", level);
+        public static void Info(string message) => Write($"{Prefix} {message}", LogLevel.Info);
         public static void Error(string message) => Write($"{Prefix} {message}", LogLevel.Error);
         public static void Warn(string message) => Write($"{Prefix} {message}", LogLevel.Warn);
         public static void Debug(string message) => Write($"{Prefix} {message}", LogLevel.Debug);

@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using HunterPie.Core;
 using Plugin.Sync.Model;
 using Plugin.Sync.Util;
 
-namespace Plugin.Sync.Server
+namespace Plugin.Sync.Services
 {
     public class SyncService
     {
@@ -31,16 +30,16 @@ namespace Plugin.Sync.Server
                 switch (mode)
                 {
                     case SyncServiceMode.Idle:
-                        this.poll.SetState(false);
-                        this.push.SetState(false);
+                        this.poll.SetEnabled(false);
+                        this.push.SetEnabled(false);
                         break;
                     case SyncServiceMode.Poll:
-                        this.poll.SetState(true);
-                        this.push.SetState(false);
+                        this.poll.SetEnabled(true);
+                        this.push.SetEnabled(false);
                         break;
                     case SyncServiceMode.Push:
-                        this.poll.SetState(false);
-                        this.push.SetState(true);
+                        this.poll.SetEnabled(false);
+                        this.push.SetEnabled(true);
                         break;
                     default:
                         throw new ArgumentOutOfRangeException(nameof(mode), mode, null);

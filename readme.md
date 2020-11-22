@@ -36,9 +36,20 @@ After these steps, you can just edit plugin project inside HunterPie solution an
 Here is diagram:
 ![project structure](./readme/stucture-scheme.svg)
 
+### module.json can have placeholders that will be populated on build:
+
+- `$hash:<filename>$`: SHA hash of file
+
+- `$version:<filename>$`: version of file
+
+- `$BRANCH$`: current branch name
 
 ## Sync server
 Server source and communication protocol documentation can be found in it's [repository](https://github.com/amadare42/HunterPie.SyncPlugin.Server).
+
+Poll (syncing as non-leader party member) operates using state-machine. Chart that describes it:
+
+![poll state matchine](./readme/poll-states.svg)
 
 ## Limitations and planned improvements
 
@@ -54,10 +65,6 @@ In order to alter monster update flow, reflections used heavily. This is making 
 
 Since plugin must have dependency on HunterPie project, it's impossible to just add this as an dependency for it for straight-forward build and debug. If HunterPie will be able to split plugin dependencies that are shared between application and plugin, required structure can be simplified.  
 
-**Server protocol optimization**
+**Server protocol optimization** (DONE!)
 
-After each monster state update, whole monster data is sent instead of only changed data, plugin sends all monster information at the same time. Protocol and implementation must be updated to be able to handle diff models.
-
-**Websockets support**
-
-Current update scheme using long-polling which isn't ideal, but it simpler to implement than using websockets. Ideally, websockets should be used.
+**Websockets support** (DONE!)
