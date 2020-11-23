@@ -184,11 +184,11 @@ namespace Plugin.Sync.Services
                     isReconnecting = false;
 
                     // don't need to push anything if became solo in session
-                    // if (isSingle)
-                    // {
-                    //     await Task.Delay(50, token);
-                    //     continue;
-                    // }
+                    if (isSingle)
+                    {
+                        await Task.Delay(50, token);
+                        continue;
+                    }
                     var monsters = ConsumeQueue();
 
                     // wait for changes to appear
@@ -207,7 +207,7 @@ namespace Plugin.Sync.Services
                     sw.Restart();
 
                     // throttling
-                    await Task.Delay(250, token);
+                    await Task.Delay(150, token);
                 }
                 catch (OperationCanceledException)
                 {

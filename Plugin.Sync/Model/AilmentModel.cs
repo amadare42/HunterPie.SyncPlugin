@@ -48,9 +48,9 @@ namespace Plugin.Sync.Model
             return this.MaxDuration.Equals(other.MaxDuration)
                    && this.Index == other.Index
                    // TODO: dirty solution
-                   && Math.Abs((int)(this.Duration - other.Duration)) < 0.9
+                   && Math.Abs(this.Duration - other.Duration) < 0.9
                    && this.MaxBuildup.Equals(other.MaxBuildup) 
-                   && this.Buildup.Equals(other.Buildup) 
+                   && Math.Abs(this.Buildup - other.Buildup) < 0.9
                    && this.Counter == other.Counter;
         }
 

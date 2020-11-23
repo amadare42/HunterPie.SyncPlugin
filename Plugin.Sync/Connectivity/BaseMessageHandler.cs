@@ -21,7 +21,7 @@ namespace Plugin.Sync.Connectivity
                 Converters = 
                 {
                     // we don't need that level of precision
-                    new LimitFloatPrecisionConverter(4),
+                    new LimitFloatPrecisionConverter(2),
                     new Newtonsoft.Json.Converters.StringEnumConverter(new CamelCaseNamingStrategy())
                 }
             };

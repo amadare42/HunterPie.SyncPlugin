@@ -221,10 +221,9 @@ namespace Plugin.Sync
             if (monsterModel != null)
             {
                 UpdateFromMonsterModel(monster, monsterModel);
+                // we don't need to process same updates again, so we can clear them
+                monstersBorrow.Value.Remove(monsterModel);
             }
-            
-            // we don't need to process same updates again, so we can clear them
-            monstersBorrow.Value.Clear();
         }
 
         private void UpdateFromMonsterModel(Monster monster, MonsterModel monsterModel)
