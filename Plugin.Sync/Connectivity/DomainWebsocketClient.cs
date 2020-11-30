@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Specialized;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web;
 using Plugin.Sync.Util;
 using vtortola.WebSockets;
 using vtortola.WebSockets.Deflate;
@@ -11,7 +13,7 @@ namespace Plugin.Sync.Connectivity
 {
     /// <summary>
     /// Wraps Websockets transport details such as ping-ponging, reconnect, receiving and sending messages. 
-    /// NOTE: this class is not thread-safe. Should be used with locks.
+    /// NOTE: this class is not thread-safe by design. Should be used with locks.
     /// </summary>
     public class DomainWebsocketClient : IDisposable
     {
@@ -53,10 +55,10 @@ namespace Plugin.Sync.Connectivity
         /// <summary>
         /// If connection isn't active, connect. Otherwise don't do anything.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>false if was already connected, true if connected successfully</returns>
         /// <exception cref="OperationCanceledException"></exception>
         /// <exception cref="WebsocketConnectionFailedException"></exception>
-        public async Task<bool> AssertConnected(string endpoint, CancellationToken cancellationToken)
+        public async Task<bool> AssertConnected(string endpoint, string playerName, CancellationToken cancellationToken)
         {
             if (this.client != null && this.wsClient != null && this.wsClient.IsConnected)
             {
@@ -64,6 +66,8 @@ namespace Plugin.Sync.Connectivity
             }
             
             var retryCount = 0;
+            var uriBuilder = new UriBuilder(endpoint) {Query = "playerName=" + HttpUtility.UrlEncode(playerName)};
+            var uri = uriBuilder.Uri;
 
             do
             {
@@ -73,7 +77,7 @@ namespace Plugin.Sync.Connectivity
                     this.receiveMessagesCts = new CancellationTokenSource();
                     
                     this.client = new WebSocketClient(this.options);
-                    this.wsClient = await this.client.ConnectAsync(new Uri(endpoint), cancellationToken);
+                    this.wsClient = await this.client.ConnectAsync(uri, cancellationToken);
                     _ = Task.Run(() => ReceiveMessagesLoop(this.receiveMessagesCts.Token), cancellationToken);
                     Logger.Log("Connected to server");
                     return true;
@@ -109,6 +113,7 @@ namespace Plugin.Sync.Connectivity
 
         public async Task Close()
         {
+            Logger.Debug($"Called close {Environment.StackTrace}");
             try
             {
                 if (this.wsClient != null && this.wsClient.IsConnected)
@@ -132,11 +137,13 @@ namespace Plugin.Sync.Connectivity
 
         private async void ReceiveMessagesLoop(CancellationToken token)
         {
+            Logger.Debug("WS message loop started.");
             while (!token.IsCancellationRequested)
             {
                 try
                 {
                     var responseStream = await this.wsClient.ReadMessageAsync(token).ConfigureAwait(false);
+                    Logger.Trace("WS stream.");
                     if (responseStream == null) continue;
                     this.messageHandler.ReceiveMessage(responseStream);
                 }
@@ -153,16 +160,18 @@ namespace Plugin.Sync.Connectivity
                     {
                         await Task.Delay(1000, token);
                     }
-                    catch (TaskCanceledException)
+                    catch (OperationCanceledException)
                     {
                         // will return normally
                     }
                 }
             }
+            Logger.Debug("WS message loop stopped.");
         }
         
         public void Dispose()
         {
+            Logger.Debug("WS disposed.");
             Close().Wait();
         }
     }

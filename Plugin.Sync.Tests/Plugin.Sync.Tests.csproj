@@ -12,6 +12,7 @@
         <AssemblyName>Plugin.Sync.Tests</AssemblyName>
         <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
         <FileAlignment>512</FileAlignment>
+        <LangVersion>latest</LangVersion>
     </PropertyGroup>
     <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
         <PlatformTarget>AnyCPU</PlatformTarget>
@@ -33,6 +34,16 @@
         <WarningLevel>4</WarningLevel>
     </PropertyGroup>
     <ItemGroup>
+        <Reference Include="HunterPie, Version=1.0.3.9806, Culture=neutral, PublicKeyToken=null">
+          <HintPath>..\..\HunterPie\HunterPie\bin\Debug\HunterPie.exe</HintPath>
+        </Reference>
+        <Reference Include="Newtonsoft.Json, Version=12.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed">
+          <HintPath>..\Plugin.Sync\bin\Release\Newtonsoft.Json.dll</HintPath>
+        </Reference>
+        <Reference Include="Stateless, Version=4.0.0.0, Culture=neutral, PublicKeyToken=93038f0927583c9a">
+          <HintPath>..\packages\Stateless.5.1.5\lib\net472\Stateless.dll</HintPath>
+          <Private>True</Private>
+        </Reference>
         <Reference Include="System" />
         <Reference Include="System.Core" />
         <Reference Include="System.Data" />
@@ -54,6 +65,7 @@
         <Compile Include="Integration\MockGenerator.cs" />
         <Compile Include="Integration\WebsocketsTests.cs" />
         <Compile Include="Properties\AssemblyInfo.cs" />
+        <Compile Include="StateMachineTests.cs" />
         <Compile Include="TestOutputLogger.cs" />
     </ItemGroup>
     <ItemGroup>
@@ -61,6 +73,9 @@
         <Project>{8ab11732-f17a-4841-b10d-e1d48f86d58e}</Project>
         <Name>Plugin.Sync</Name>
       </ProjectReference>
+    </ItemGroup>
+    <ItemGroup>
+      <None Include="packages.config" />
     </ItemGroup>
     <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
     <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

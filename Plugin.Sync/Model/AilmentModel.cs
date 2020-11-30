@@ -1,6 +1,7 @@
 ﻿using System;
 using HunterPie.Core;
 using HunterPie.Core.Definitions;
+using Plugin.Sync.Util;
 
 namespace Plugin.Sync.Model
 {
@@ -47,10 +48,9 @@ namespace Plugin.Sync.Model
 
             return this.MaxDuration.Equals(other.MaxDuration)
                    && this.Index == other.Index
-                   // TODO: dirty solution
-                   && Math.Abs(this.Duration - other.Duration) < 0.9
-                   && this.MaxBuildup.Equals(other.MaxBuildup) 
-                   && Math.Abs(this.Buildup - other.Buildup) < 0.9
+                   && this.Duration.EqualsDelta(other.Duration, 0.9f)
+                   && this.MaxBuildup.EqualsDelta(other.MaxBuildup, 0.9f)
+                   && this.Buildup.EqualsDelta(other.Buildup, 0.9f)
                    && this.Counter == other.Counter;
         }
 

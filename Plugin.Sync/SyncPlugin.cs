@@ -18,7 +18,6 @@ namespace Plugin.Sync
         public string Description { get; set; }
         public Game Context { get; set; }
 
-        private readonly Action<Part, MonsterPartModel> UpdateTenderizePart;
         private readonly Action<Monster> LeadersMonsterUpdate;
         private readonly Action<Monster> PeersMonsterUpdate;
 
@@ -28,7 +27,6 @@ namespace Plugin.Sync
         {
             this.syncService = new SyncService();
 
-            this.UpdateTenderizePart = ReflectionsHelper.CreateUpdateTenderizePartFn();
             this.LeadersMonsterUpdate = ReflectionsHelper.CreateLeadersMonsterUpdateFn();
             this.PeersMonsterUpdate = ReflectionsHelper.CreatePeersMonsterUpdateFn();
             ConfigService.Load();
@@ -97,12 +95,17 @@ namespace Plugin.Sync
 
         private bool IsGameInSyncableState() => !this.Context.Player.InPeaceZone
                                                 && this.Context.Player.ZoneID != TrainingAreaZoneId
-                                                && !string.IsNullOrEmpty(this.Context.Player.SessionID)
-                                                && this.Context.Player.PlayerParty.Size > 1;
+                                                && !string.IsNullOrEmpty(this.Context.Player.SessionID);
+                                                // && this.Context.Player.PlayerParty.Size > 1;
 
         private void UpdateSyncState(string trigger)
         {
             this.syncService.SetSessionId(this.Context.Player.SessionID);
+            if (!string.IsNullOrEmpty(this.Context?.Player.Name))
+            {
+                this.syncService.PlayerName = this.Context.Player.Name;
+            }
+
             if (!IsGameInSyncableState())
             {
                 if (this.syncService.SetMode(SyncServiceMode.Idle))
@@ -243,20 +246,14 @@ namespace Plugin.Sync
             {
                 var upd = updatedParts.FirstOrDefault(p => p.Index == i);
                 if (upd == null) continue;
-                
-                parts[i].SetPartInfo(upd.ToDomain());
-                monster.Parts[i].IsRemovable = upd.IsRemovable;
-                this.UpdateTenderizePart(monster.Parts[i], upd);
+                parts[i].Health = upd.Health;
             }
             
             for (var i = 0; i < ailments.Count; i++)
             {
                 var upd = updatedAilments.FirstOrDefault(p => p.Index == i);
                 if (upd == null) continue;
-                
-                // TODO: ailments timers should not be synced, since peer member's game keep track of it
-                // this is here because GetMonsterAilments is disabled, so all ailment data must be sourced from somewhere
-                monster.Ailments[i].SetAilmentInfo(upd.ToDomain());
+                monster.Ailments[i].Buildup = upd.Buildup;
             }
         }
         

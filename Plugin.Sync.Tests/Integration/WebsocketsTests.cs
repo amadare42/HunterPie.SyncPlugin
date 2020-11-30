@@ -1,6 +1,14 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
+using HunterPie.Core;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Plugin.Sync.Connectivity;
 using Plugin.Sync.Services;
 using Plugin.Sync.Util;
 using Xunit;
@@ -16,44 +24,49 @@ namespace Plugin.Sync.Tests
         public PushTests(ITestOutputHelper testOutput)
         {
             this.testOutput = testOutput;
-            Logger.Target = new TestOutputLogger(testOutput);
+            Logger.Targets = new List<ILoggerTarget>
+            {
+                new TestOutputLogger(testOutput)
+            };
             Logger.Prefix = "";
             Logger.LogLevel = LogLevel.Trace;
             ConfigService.Current = new Config
             {
                 ServerUrl = "http://localhost:5001/dev"
             };
+            UserSettings.PlayerConfig = new UserSettings.Config.Rootobject {Overlay = {GameScanDelay = 150}};
         }
 
         /// <summary>
-        /// Can be visualized using https://dreampuf.github.io/
+        /// Can be visualized using https://dreampuf.github.io/GraphvizOnline/
         /// </summary>
         [Fact]
         public void PrintPollServiceGraph()
         {
-            var poll = new PollService();
+            var poll = new SyncService();
             var graph = poll.GetStateMachineGraph();
             this.testOutput.WriteLine(graph);
         }
 
         [Fact]
-        public void PushService_Infinite()
+        public void SyncService_Push_Infinite()
         {
-            var push = new PushService {SessionId = SessionId};
-            push.SetEnabled(true);
+            var sync = new SyncService {SessionId = "c3@uTKeQR3Mp"};
+            sync.SetMode(SyncServiceMode.Push);
 
             while (true)
             {
-                push.PushMonster(MockGenerator.GenerateModel());
-                Thread.Sleep(3000);
+                var generateModel = MockGenerator.GenerateModel();
+                sync.PushMonster(generateModel);
+                Thread.Sleep(150);
             }
         }
 
         [Fact]
         public void PollService_Infinite()
         {
-            var poll = new PollService {SessionId = SessionId};
-            poll.SetEnabled(true);
+            var poll = new SyncService {SessionId = "c3@uTKeQR3Mp"};
+            poll.SetMode(SyncServiceMode.Poll);
 
             while (true)
             {
@@ -61,12 +74,24 @@ namespace Plugin.Sync.Tests
                 {
                     if (borrow.Value.Count != 0)
                     {
-                        testOutput.WriteLine(borrow.Value.First().Id);
+                        var text = JsonConvert.SerializeObject(borrow.Value, Formatting.Indented);
+                        Logger.Info(text);
                         borrow.Value.Clear();
                     }
                 }
                 Thread.Sleep(1000);
             }
+        }
+    }
+
+    public class PrintMessageHandler : BaseMessageHandler, IMessageHandler
+    {
+        public void ReceiveMessage(Stream stream)
+        {
+            var sr = new StreamReader(stream, Encoding.UTF8);
+            using var jsonReader = new JsonTextReader(sr);
+            var jObj = JObject.Load(jsonReader);
+            Logger.Info($"[rcvd] ${jObj.ToString(Formatting.Indented)}");
         }
     }
 }

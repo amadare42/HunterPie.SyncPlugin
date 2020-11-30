@@ -18,24 +18,6 @@ namespace Plugin.Sync
                 .SetValue(monster, scan);
         }
         
-        public static Action<Part, MonsterPartModel> CreateUpdateTenderizePartFn()
-        {
-            // TODO: use expressions
-
-            var tMaxDurProp = typeof(Part).GetProperty("TenderizeMaxDuration");
-            var tDurProp = typeof(Part).GetProperty("TenderizeDuration");
-            if (tDurProp == null || tMaxDurProp == null)
-            {
-                Logger.Error("Cannot create tenderize update function. Part's tenderize state will not be updated.");
-                return (part, model) => { };
-            }
-            return (part, model) =>
-            {
-                tMaxDurProp.SetValue(part, model.TenderizeMaxDuration);
-                tDurProp.SetValue(part, model.TenderizeDuration);
-            };
-        }
-        
         public static Action<Monster> CreateLeadersMonsterUpdateFn()
         {
 

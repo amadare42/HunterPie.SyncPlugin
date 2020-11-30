@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
-using Plugin.Sync.Model;
+using Plugin.Sync.Connectivity.Model;
 using Plugin.Sync.Util;
 
 namespace Plugin.Sync.Connectivity
@@ -11,7 +11,7 @@ namespace Plugin.Sync.Connectivity
     public class BaseMessageHandler
     {
         protected const int MaxMessageSize = 16384;
-        protected JsonSerializer Serializer;
+        protected readonly JsonSerializer Serializer;
         
         public BaseMessageHandler()
         {
@@ -20,7 +20,7 @@ namespace Plugin.Sync.Connectivity
                 ContractResolver = new CamelCasePropertyNamesContractResolver(),
                 Converters = 
                 {
-                    // we don't need that level of precision
+                    // we don't need that level of precision, this will reduce packet size a bit
                     new LimitFloatPrecisionConverter(2),
                     new Newtonsoft.Json.Converters.StringEnumConverter(new CamelCaseNamingStrategy())
                 }

@@ -1,11 +1,49 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Net.Http;
+using System.Runtime.CompilerServices;
+using System.Text;
 using HunterPie.Logger;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Plugin.Sync.Util
 {
     public interface ILoggerTarget
     {
         void Log(string message, LogLevel level);
+    }
+
+    public class ServerLoggerTarget : ILoggerTarget
+    {
+        private readonly string user;
+        private HttpClient client = new HttpClient();
+
+        public ServerLoggerTarget(string user)
+        {
+            this.user = user;
+        }
+
+        public async void Log(string message, LogLevel level)
+        {
+            var jObj = new JObject
+            {
+                ["timestamp"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                ["level"] = level.ToString("G"),
+                ["msg"] = message,
+                ["text"] = $"{DateTime.Now:HH:mm:ss:fff} [{level:G}] {message}",
+                ["user"] = this.user
+            };
+            var content = new StringContent(jObj.ToString(), Encoding.UTF8, "application/json");
+            try
+            {
+                await this.client.PostAsync(ConfigService.Current.ServerUrl + "/logs/add", content);
+            }
+            catch (Exception)
+            {
+                // ignored
+            }
+        }
     }
 
     public enum LogLevel
@@ -68,7 +106,13 @@ namespace Plugin.Sync.Util
 
         public static LogLevel LogLevel = LogLevel.Info;
 
-        public static ILoggerTarget Target = new HunterPieDebugger();
+        public static List<ILoggerTarget> Targets = new List<ILoggerTarget>
+        {
+            new HunterPieDebugger()
+        };
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool IsEnabled(LogLevel level) => LogLevel <= level;
 
         public static void Log(string message, LogLevel level = LogLevel.Info) => Write($"{Prefix} {message}", level);
         public static void Info(string message) => Write($"{Prefix} {message}", LogLevel.Info);
@@ -81,7 +125,10 @@ namespace Plugin.Sync.Util
         private static void Write(string message, LogLevel level)
         {
             if (level < LogLevel) return;
-            Target.Log(message, level);
+            foreach (var target in Targets)
+            {
+                target.Log(message, level);
+            }
         }
     }
 }

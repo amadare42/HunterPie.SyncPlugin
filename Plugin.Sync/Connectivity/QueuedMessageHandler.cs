@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Plugin.Sync.Model;
+using Plugin.Sync.Connectivity.Model;
 
 namespace Plugin.Sync.Connectivity
 {

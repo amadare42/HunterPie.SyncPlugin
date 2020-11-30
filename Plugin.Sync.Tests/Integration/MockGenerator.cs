@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Linq;
-using System.Text.RegularExpressions;
 using Plugin.Sync.Model;
 
 namespace Plugin.Sync.Tests
@@ -14,17 +13,28 @@ namespace Plugin.Sync.Tests
             return new MonsterModel
             {
                 Id = "em_001",
-                Parts = Enumerable.Repeat(0, 60).Select(_ => GeneratePart()).ToList()
+                Parts = Enumerable.Range(0, 30).Select(GeneratePartClose).ToList()
             };
         }
         
-        private static MonsterPartModel GeneratePart()
+        private static MonsterPartModel GeneratePartClose(int idx)
         {
             return new MonsterPartModel
             {
-                Health = (float) random.NextDouble(),
-                MaxHealth = (float) random.NextDouble()
+                Index = idx,
+                Health = random.Next(97, 100),
+                MaxHealth = 100
             };
         }
+        
+        // private static MonsterPartModel GeneratePart(int idx)
+        // {
+        //     return new MonsterPartModel
+        //     {
+        //         Index = idx,
+        //         Health = (float) random.NextDouble() + random.Next(100, 2000),
+        //         MaxHealth = (float) random.NextDouble() + random.Next(100, 2000)
+        //     };
+        // }
     }
 }

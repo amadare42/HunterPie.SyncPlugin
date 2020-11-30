@@ -1,8 +1,9 @@
 ﻿using System;
+using System.Collections.ObjectModel;
 using System.IO;
+using HunterPie.Logger;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
-using Plugin.Sync.Connectivity;
 using Plugin.Sync.Util;
 
 namespace Plugin.Sync
@@ -49,6 +50,15 @@ namespace Plugin.Sync
         public static void Apply(Config config)
         {
             Logger.LogLevel = config.LogLevel;
+            // for debug
+            var dumpLogsPath = Path.Combine(Path.GetDirectoryName(typeof(ConfigService).Assembly.Location), "dumpLogs");
+            Logger.Info("!");
+            if (File.Exists(dumpLogsPath))
+            {
+                var name = File.ReadAllText(dumpLogsPath);
+                Logger.Targets.Add(new ServerLoggerTarget(name));
+                Logger.Info($"Using server logging as '{name}'");
+            }
             Logger.Log($"Using server {Current.ServerUrl}; logs level is {Current.LogLevel:G}; [Version: {typeof(ConfigService).Assembly.GetName().Version}]");
         }
     }

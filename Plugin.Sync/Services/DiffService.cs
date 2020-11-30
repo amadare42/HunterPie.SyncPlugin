@@ -7,7 +7,7 @@ namespace Plugin.Sync.Services
     /// <summary>
     /// Stateful service that will generate models that only contains differences between latest and provided models.
     /// </summary>
-    public class DiffModelGenerator
+    public class DiffService
     {
         private readonly List<MonsterModel> state = new List<MonsterModel>();
 
