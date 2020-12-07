@@ -33,7 +33,7 @@ Due to HunterPie's plugin system, it can be a bit tricky to conveniently debug a
 
 After these steps, you can just edit plugin project inside HunterPie solution and will have latest binaries for each run so it is easily debbuggable.
 
-Here is diagram:
+Synchronization 
 ![project structure](./readme/stucture-scheme.svg)
 
 ### module.json can have placeholders that will be populated on build:

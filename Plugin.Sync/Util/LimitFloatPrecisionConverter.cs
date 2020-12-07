@@ -14,7 +14,7 @@ namespace Plugin.Sync.Util
 
         public override bool CanConvert(Type objectType)
         {
-            return (objectType == typeof(float));
+            return objectType == typeof(float);
         }
 
         public override void WriteJson(JsonWriter writer, object value, 

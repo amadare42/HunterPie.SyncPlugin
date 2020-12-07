@@ -1,7 +1,6 @@
 ﻿param([string]$root)
 $ErrorActionPreference = 'Stop'
 
-
 function Get-BranchName() {
     try {
         $branch = git rev-parse --abbrev-ref HEAD

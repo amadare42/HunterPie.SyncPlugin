@@ -15,7 +15,9 @@ namespace Plugin.Sync.Tests
 
         public void Log(string message, LogLevel level)
         {
-            this.output.WriteLine($"{DateTime.Now:HH:mm:ss:ffff} [{level:G}] {message}");
+            var value = $"{DateTime.Now:HH:mm:ss:ffff} [{level:G}] {message}";
+            Console.WriteLine(value);
+            this.output.WriteLine(value);
         }
     }
 }

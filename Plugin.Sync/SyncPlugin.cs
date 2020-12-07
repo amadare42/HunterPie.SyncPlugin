@@ -1,11 +1,9 @@
 ﻿using System;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using HunterPie.Core;
 using HunterPie.Core.Events;
-using HunterPie.Memory;
 using HunterPie.Plugins;
+using Plugin.Sync.Connectivity;
 using Plugin.Sync.Model;
 using Plugin.Sync.Services;
 using Plugin.Sync.Util;
@@ -18,18 +16,18 @@ namespace Plugin.Sync
         public string Description { get; set; }
         public Game Context { get; set; }
 
-        private readonly Action<Monster> LeadersMonsterUpdate;
-        private readonly Action<Monster> PeersMonsterUpdate;
-
         private readonly SyncService syncService;
+
+        private readonly Action<Monster, int> updateMonsterHealth;
 
         public SyncPlugin()
         {
-            this.syncService = new SyncService();
-
-            this.LeadersMonsterUpdate = ReflectionsHelper.CreateLeadersMonsterUpdateFn();
-            this.PeersMonsterUpdate = ReflectionsHelper.CreatePeersMonsterUpdateFn();
             ConfigService.Load();
+            var wsClient = new DomainWebsocketClient(ConfigService.GetWsUrl());
+            this.syncService = new SyncService(wsClient);
+            this.syncService.OnSyncModeChanged += OnSyncModeChanged;
+
+            this.updateMonsterHealth = ReflectionsHelper.CreateUpdateMonsterHealth();
         }
 
         public void Initialize(Game context)
@@ -44,8 +42,11 @@ namespace Plugin.Sync
             {
                 member.OnSpawn += OnMemberSpawn;
             }
-
-            Task.Run(WaitForScan);
+            
+            foreach (var monster in this.Context.Monsters)
+            {
+                monster.OnMonsterScanFinished += OnMonsterScanFinished;
+            }
         }
 
         public void Unload()
@@ -54,12 +55,18 @@ namespace Plugin.Sync
             this.Context.Player.OnSessionChange -= OnSessionChange;
             this.Context.Player.OnCharacterLogout -= OnCharacterLogout;
             this.Context.Player.OnCharacterLogin -= OnCharacterLogin;
+            
             if (this.Context.Player.PlayerParty.Members != null)
             {
                 foreach (var member in this.Context.Player.PlayerParty.Members)
                 {
                     member.OnSpawn -= OnMemberSpawn;
                 }
+            }
+            
+            foreach (var monster in this.Context.Monsters)
+            {
+                monster.OnMonsterScanFinished -= OnMonsterScanFinished;
             }
 
             this.Context = null;
@@ -88,6 +95,28 @@ namespace Plugin.Sync
         private void OnCharacterLogout(object source, EventArgs args) => UpdateSyncState("character logout");
         
         private void OnCharacterLogin(object source, EventArgs args) => UpdateSyncState("character login");
+        
+        private void OnMonsterScanFinished(object source, EventArgs args)
+        {
+            var monster = (Monster) source;
+            if (this.syncService.Mode == SyncServiceMode.Idle
+                || string.IsNullOrEmpty(monster.Id)
+                || !IsGameInSyncableState())
+            {
+                return;
+            }
+
+            var isLeader = IsLeader();
+            if (isLeader && this.syncService.Mode == SyncServiceMode.Push)
+            {
+                var monsterModel = MapMonster(monster);
+                this.syncService.PushMonster(monsterModel);
+            }
+            else if (!isLeader && this.syncService.Mode == SyncServiceMode.Poll)
+            {
+                PullData(monster);
+            }
+        }
 
         private bool IsLeader() => this.Context?.Player.PlayerParty.Members.Any(m => m.IsInParty && m.IsMe && m.IsPartyLeader) ?? false;
 
@@ -95,11 +124,16 @@ namespace Plugin.Sync
 
         private bool IsGameInSyncableState() => !this.Context.Player.InPeaceZone
                                                 && this.Context.Player.ZoneID != TrainingAreaZoneId
-                                                && !string.IsNullOrEmpty(this.Context.Player.SessionID);
-                                                // && this.Context.Player.PlayerParty.Size > 1;
+                                                && !string.IsNullOrEmpty(this.Context.Player.SessionID)
+                                                #if DEBUG
+                                                ;
+                                                #else
+                                                && this.Context.Player.PlayerParty.Size > 1;
+                                                #endif
 
         private void UpdateSyncState(string trigger)
         {
+            Logger.Log($"Event: {trigger}");
             this.syncService.SetSessionId(this.Context.Player.SessionID);
             if (!string.IsNullOrEmpty(this.Context?.Player.Name))
             {
@@ -108,113 +142,30 @@ namespace Plugin.Sync
 
             if (!IsGameInSyncableState())
             {
-                if (this.syncService.SetMode(SyncServiceMode.Idle))
-                {
-                    Logger.Log($"SyncState: Idle [{trigger}]");
-                }
-                return;
-            }
-
-            if (IsLeader())
+                this.syncService.SetMode(SyncServiceMode.Idle);
+            } 
+            else if (IsLeader())
             {
-                if (this.syncService.SetMode(SyncServiceMode.Push))
-                {
-                    // if became leader, push all monsters
-                    foreach (var monster in this.Context.Monsters)
-                    {
-                        var monsterModel = MapMonster(monster);
-                        this.syncService.PushMonster(monsterModel);
-                    }
-
-                    Logger.Log($"SyncState: Push [{trigger}]");
-                }
+                this.syncService.SetMode(SyncServiceMode.Push);
             }
             else
             {
-                if (this.syncService.SetMode(SyncServiceMode.Poll))
+                this.syncService.SetMode(SyncServiceMode.Poll);
+            }
+        }
+
+        private void OnSyncModeChanged(object sender, SyncServiceMode mode)
+        {
+            Logger.Info($"SyncState: {mode}");
+            if (mode == SyncServiceMode.Push)
+            {
+                // if became leader, push all monsters
+                foreach (var monster in this.Context.Monsters)
                 {
-                    Logger.Log($"SyncState: Poll [{trigger}]");
+                    var monsterModel = MapMonster(monster);
+                    this.syncService.PushMonster(monsterModel);
                 }
             }
-        }
-        
-        
-        /// Waiting for <see cref="Game.StartScanning"/> call to finish, so we can be sure that scan loops are started. 
-        private async Task WaitForScan()
-        {
-            while (this.Context != null && !this.Context.IsActive)
-            {
-                await Task.Delay(500);
-            }
-
-            if (this.Context != null)
-            {
-                OnScanStarted();
-            }
-        }
-
-        private void OnScanStarted()
-        {
-            foreach (var monster in this.Context.Monsters)
-            {
-                UpdateMonsterScan(monster);
-            }
-
-            Logger.Log("Replaced monster polling routine");
-        }
-
-        private void UpdateMonsterScan(Monster monster)
-        {
-            ReflectionsHelper.StopMonsterThread(monster);
-            var action = CreateMonsterScanFn(monster);
-            var scanRef = new ThreadStart(action);
-            var scan = new Thread(scanRef) {Name = $"SyncPlugin_Monster.{monster.MonsterNumber}"};
-            ReflectionsHelper.UpdateMonsterScanRefs(monster, scanRef, scan);
-
-            scan.Start();
-        }
-
-        private Action CreateMonsterScanFn(Monster monster)
-        {
-            void MonsterScan()
-            {
-                while (true)
-                {
-                    if (!Kernel.GameIsRunning)
-                    {
-                        Thread.Sleep(1000);
-                        continue;
-                    }
-
-                    var isLeader = IsLeader();
-                    if (isLeader)
-                    {
-                        this.LeadersMonsterUpdate(monster);
-                        if (this.syncService.Mode == SyncServiceMode.Push 
-                            && !string.IsNullOrEmpty(monster.Id)
-                            && IsGameInSyncableState())
-                        {
-                            var monsterModel = MapMonster(monster);
-                            this.syncService.PushMonster(monsterModel);
-                        }
-                    }
-                    else
-                    {
-                        this.PeersMonsterUpdate(monster);
-                        if (this.syncService.Mode == SyncServiceMode.Poll 
-                            && !string.IsNullOrEmpty(monster.Id)
-                            && IsGameInSyncableState())
-                        {
-                            PullData(monster);
-                        }
-                    }
-
-                    Thread.Sleep(UserSettings.PlayerConfig.Overlay.GameScanDelay);
-                }
-                // ReSharper disable once FunctionNeverReturns - endless loop by design. Thread.Abort will be used to stop it
-            }
-
-            return MonsterScan;
         }
 
         private void PullData(Monster monster)
@@ -231,30 +182,34 @@ namespace Plugin.Sync
 
         private void UpdateFromMonsterModel(Monster monster, MonsterModel monsterModel)
         {
-            var parts = monster.Parts;
-            var updatedParts = monsterModel.Parts;
-            var ailments = monster.Ailments;
-            var updatedAilments = monsterModel.Ailments;
-            
-            if (parts.Count == 0 || ailments.Count == 0)
+            if (monster.Parts.Count == 0 || monster.Ailments.Count == 0)
             {
                 Logger.Trace("Monster isn't initialized, update skipped");
                 return;
             }
             
-            for (var i = 0; i < parts.Count; i++)
+            for (var i = 0; i < monster.Parts.Count; i++)
             {
-                var upd = updatedParts.FirstOrDefault(p => p.Index == i);
-                if (upd == null) continue;
-                parts[i].Health = upd.Health;
+                var upd = monsterModel.Parts.FirstOrDefault(p => p.Index == i);
+                if (upd != null)
+                {
+                    monster.Parts[i].Health = upd.Health;
+                }
             }
             
-            for (var i = 0; i < ailments.Count; i++)
+            for (var i = 0; i < monster.Ailments.Count; i++)
             {
-                var upd = updatedAilments.FirstOrDefault(p => p.Index == i);
-                if (upd == null) continue;
-                monster.Ailments[i].Buildup = upd.Buildup;
+                var upd = monsterModel.Ailments.FirstOrDefault(p => p.Index == i);
+                if (upd != null)
+                {
+                    monster.Ailments[i].Buildup = upd.Buildup;
+                }
             }
+
+            // if (monsterModel.TotalHp != 0 && monster.Health > monsterModel.TotalHp)
+            // {
+            //     this.updateMonsterHealth(monster, monsterModel.TotalHp);
+            // }
         }
         
         private static MonsterModel MapMonster(Monster monster)
@@ -263,7 +218,8 @@ namespace Plugin.Sync
             {
                 Id = monster.Id,
                 Parts = monster.Parts.Select(MonsterPartModel.FromDomain).ToList(),
-                Ailments = monster.Ailments.Select(AilmentModel.FromDomain).ToList()
+                Ailments = monster.Ailments.Select(AilmentModel.FromDomain).ToList(),
+                TotalHp = (int)monster.Health
             };
         }
     }

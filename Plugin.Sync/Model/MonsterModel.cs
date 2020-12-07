@@ -5,11 +5,20 @@ using Plugin.Sync.Util;
 
 namespace Plugin.Sync.Model
 {
+    [JsonArrayObject]
     public class MonsterModel : IEquatable<MonsterModel>
     {
+        [JsonArrayProp(Index = 0)]
         public string Id { get; set; }
+        
+        [JsonArrayProp(Index = 1)]
         public List<MonsterPartModel> Parts { get; set; } = new List<MonsterPartModel>();
+        
+        [JsonArrayProp(Index = 2)]
         public List<AilmentModel> Ailments { get; set; } = new List<AilmentModel>();
+
+        [JsonArrayProp(Index = 3)]
+        public int TotalHp { get; set; }
         
         public void UpdateWith(MonsterModel model)
         {
@@ -27,6 +36,11 @@ namespace Plugin.Sync.Model
                     model.Parts.FirstOrDefault(a => a.Index == i) ?? this.Parts.FirstOrDefault(a => a.Index == i))
                 .Where(e => e != null)
                 .ToList();
+            
+            if (this.TotalHp != 0 && model.TotalHp != 0 && model.TotalHp < this.TotalHp)
+            {
+                this.TotalHp = model.TotalHp;
+            }
         }
 
         public MonsterModel Clone()
@@ -35,7 +49,8 @@ namespace Plugin.Sync.Model
             {
                 Id = this.Id,
                 Parts = this.Parts.Select(p => p.Clone()).ToList(),
-                Ailments = this.Ailments.Select(a => a.Clone()).ToList()
+                Ailments = this.Ailments.Select(a => a.Clone()).ToList(),
+                TotalHp = this.TotalHp
             };
         }
 
@@ -51,7 +66,10 @@ namespace Plugin.Sync.Model
                 return true;
             }
 
-            return this.Id == other.Id && this.Parts.AreEqual(other.Parts) && this.Ailments.AreEqual(other.Ailments);
+            return this.Id == other.Id 
+                   && this.TotalHp == other.TotalHp
+                   && this.Parts.AreEqual(other.Parts) 
+                   && this.Ailments.AreEqual(other.Ailments);
         }
 
         public override bool Equals(object obj)
@@ -80,6 +98,7 @@ namespace Plugin.Sync.Model
             {
                 var hashCode = (this.Id != null ? this.Id.GetHashCode() : 0);
                 hashCode = (hashCode * 397) ^ (this.Parts != null ? this.Parts.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ this.TotalHp;
                 hashCode = (hashCode * 397) ^ (this.Ailments != null ? this.Ailments.GetHashCode() : 0);
                 return hashCode;
             }

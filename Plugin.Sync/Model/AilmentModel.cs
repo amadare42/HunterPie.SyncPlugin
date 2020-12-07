@@ -1,37 +1,22 @@
 ﻿using System;
 using HunterPie.Core;
-using HunterPie.Core.Definitions;
 using Plugin.Sync.Util;
 
 namespace Plugin.Sync.Model
 {
+    [JsonArrayObject]
     public class AilmentModel : IEquatable<AilmentModel>
     {
+        [JsonArrayProp(Index = 0)]
         public int Index { get; set; }
         
-        public float MaxDuration { get; set; }
-        public float Duration { get; set; }
-
-        public float MaxBuildup { get; set; }
+        [JsonArrayProp(Index = 1)]
         public float Buildup { get; set; }
-        public uint Counter { get; set; }
-        
-        public sMonsterAilment ToDomain() => new sMonsterAilment
-        {
-            MaxBuildup = this.MaxBuildup,
-            Duration = this.Duration,
-            Buildup = this.Buildup,
-            Counter = this.Counter
-        };
 
         public static AilmentModel FromDomain(Ailment a, int ailmentIndex) => new AilmentModel
         {
             Index = ailmentIndex,
-            Buildup = a.Buildup,
-            MaxBuildup = a.MaxBuildup,
-            Counter = a.Counter,
-            Duration = a.Duration,
-            MaxDuration = a.MaxDuration
+            Buildup = a.Buildup
         };
 
         public bool Equals(AilmentModel other)
@@ -46,12 +31,8 @@ namespace Plugin.Sync.Model
                 return true;
             }
 
-            return this.MaxDuration.Equals(other.MaxDuration)
-                   && this.Index == other.Index
-                   && this.Duration.EqualsDelta(other.Duration, 0.9f)
-                   && this.MaxBuildup.EqualsDelta(other.MaxBuildup, 0.9f)
-                   && this.Buildup.EqualsDelta(other.Buildup, 0.9f)
-                   && this.Counter == other.Counter;
+            return this.Index == other.Index
+                   && this.Buildup.EqualsDelta(other.Buildup, 0.9f);
         }
 
         public override bool Equals(object obj)
@@ -78,11 +59,7 @@ namespace Plugin.Sync.Model
         {
             unchecked
             {
-                var hashCode = this.MaxDuration.GetHashCode();
-                hashCode = (hashCode * 397) ^ ((int)this.Duration).GetHashCode();
-                hashCode = (hashCode * 397) ^ this.MaxBuildup.GetHashCode();
-                hashCode = (hashCode * 397) ^ this.Buildup.GetHashCode();
-                hashCode = (hashCode * 397) ^ (int) this.Counter;
+                var hashCode = this.Buildup.GetHashCode();
                 hashCode = (hashCode * 397) ^ this.Index;
                 return hashCode;
             }
@@ -93,11 +70,7 @@ namespace Plugin.Sync.Model
             return new AilmentModel
             {
                 Index = this.Index,
-                Buildup = this.Buildup,
-                Counter = this.Counter,
-                Duration = this.Duration,
-                MaxBuildup = this.MaxBuildup,
-                MaxDuration = this.MaxDuration
+                Buildup = this.Buildup
             };
         }
     }

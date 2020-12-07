@@ -39,7 +39,7 @@ namespace Plugin.Sync.Services
 
         private void ReleaseSemaphore() => this.semaphore.Release();
         
-        public  void UpdateMonsters(List<MonsterModel> monsters)
+        public void UpdateMonsters(List<MonsterModel> monsters)
         {
             using var borrow = BorrowMonsters();
             

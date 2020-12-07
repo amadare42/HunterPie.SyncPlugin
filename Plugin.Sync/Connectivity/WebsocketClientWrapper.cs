@@ -1,8 +1,7 @@
 ﻿using System;
-using System.Collections.Specialized;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Web;
+using Plugin.Sync.Connectivity.Model;
 using Plugin.Sync.Util;
 using vtortola.WebSockets;
 using vtortola.WebSockets.Deflate;
@@ -11,11 +10,56 @@ using WebSocket = vtortola.WebSockets.WebSocket;
 
 namespace Plugin.Sync.Connectivity
 {
+    public interface IDomainWebsocketClient
+    {
+        event EventHandler<Exception> OnConnectionError;
+        event EventHandler<IMessage> OnMessage; 
+        bool IsConnected { get; }
+        Uri Endpoint { get; }
+        Task<bool> AssertConnected(CancellationToken cancellationToken);
+        Task Send<T>(T dto, CancellationToken cancellationToken) where T : IMessage;
+        Task Close();
+    }
+
+    public class DomainWebsocketClient : IDomainWebsocketClient
+    {
+        public event EventHandler<Exception> OnConnectionError
+        {
+            add => this.client.OnConnectionError += value;
+            remove => this.client.OnConnectionError -= value;
+        }
+        
+        public event EventHandler<IMessage> OnMessage
+        {
+            add => this.msgHandler.OnMessage += value;
+            remove => this.msgHandler.OnMessage -= value;
+        }
+        
+        public bool IsConnected => this.client.IsConnected;
+        public Uri Endpoint => this.client.Endpoint;
+
+        private readonly WebsocketClientWrapper client;
+        private readonly EventMessageHandler msgHandler;
+
+        public DomainWebsocketClient(string endpoint)
+        {
+            var uri = new UriBuilder(endpoint).Uri;
+            this.msgHandler = new EventMessageHandler();
+            this.client = new WebsocketClientWrapper(uri, this.msgHandler, new JsonMessageEncoder());
+        }
+
+        public Task<bool> AssertConnected(CancellationToken cancellationToken) => this.client.AssertConnected(cancellationToken);
+
+        public Task Send<T>(T dto, CancellationToken cancellationToken) where T : IMessage => this.client.Send(dto, cancellationToken);
+
+        public Task Close() => this.client.Close();
+    }
+    
     /// <summary>
     /// Wraps Websockets transport details such as ping-ponging, reconnect, receiving and sending messages. 
     /// NOTE: this class is not thread-safe by design. Should be used with locks.
     /// </summary>
-    public class DomainWebsocketClient : IDisposable
+    public class WebsocketClientWrapper : IDisposable
     {
         private readonly IMessageHandler messageHandler;
         private readonly IMessageEncoder encoder;
@@ -23,13 +67,16 @@ namespace Plugin.Sync.Connectivity
         private WebSocket wsClient;
         private CancellationTokenSource receiveMessagesCts = new CancellationTokenSource();
         private WebSocketListenerOptions options;
+        private Task ListenLoopTask = Task.CompletedTask;
 
         public event EventHandler<Exception> OnConnectionError;
 
+        public Uri Endpoint { get; private set; }
         public bool IsConnected => this.wsClient != null && this.wsClient.IsConnected;
 
-        public DomainWebsocketClient(IMessageHandler messageHandler, IMessageEncoder encoder)
+        public WebsocketClientWrapper(Uri endpoint, IMessageHandler messageHandler, IMessageEncoder encoder)
         {
+            this.Endpoint = endpoint;
             this.messageHandler = messageHandler;
             this.encoder = encoder;
             const int bufferSize = 1024 * 8; // 8KiB
@@ -58,17 +105,17 @@ namespace Plugin.Sync.Connectivity
         /// <returns>false if was already connected, true if connected successfully</returns>
         /// <exception cref="OperationCanceledException"></exception>
         /// <exception cref="WebsocketConnectionFailedException"></exception>
-        public async Task<bool> AssertConnected(string endpoint, string playerName, CancellationToken cancellationToken)
+        public async Task<bool> AssertConnected(CancellationToken cancellationToken)
         {
-            if (this.client != null && this.wsClient != null && this.wsClient.IsConnected)
+            if (this.client != null 
+                && this.wsClient != null 
+                && this.wsClient.IsConnected 
+                && !this.receiveMessagesCts.IsCancellationRequested)
             {
                 return false;
             }
             
             var retryCount = 0;
-            var uriBuilder = new UriBuilder(endpoint) {Query = "playerName=" + HttpUtility.UrlEncode(playerName)};
-            var uri = uriBuilder.Uri;
-
             do
             {
                 try
@@ -77,7 +124,7 @@ namespace Plugin.Sync.Connectivity
                     this.receiveMessagesCts = new CancellationTokenSource();
                     
                     this.client = new WebSocketClient(this.options);
-                    this.wsClient = await this.client.ConnectAsync(uri, cancellationToken);
+                    this.wsClient = await this.client.ConnectAsync(this.Endpoint, cancellationToken);
                     _ = Task.Run(() => ReceiveMessagesLoop(this.receiveMessagesCts.Token), cancellationToken);
                     Logger.Log("Connected to server");
                     return true;
@@ -113,7 +160,7 @@ namespace Plugin.Sync.Connectivity
 
         public async Task Close()
         {
-            Logger.Debug($"Called close {Environment.StackTrace}");
+            Logger.Debug("Called close");
             try
             {
                 if (this.wsClient != null && this.wsClient.IsConnected)

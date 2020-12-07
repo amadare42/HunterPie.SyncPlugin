@@ -12,7 +12,7 @@
         <AssemblyName>Plugin.Sync.Tests</AssemblyName>
         <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
         <FileAlignment>512</FileAlignment>
-        <LangVersion>latest</LangVersion>
+        <LangVersion>preview</LangVersion>
     </PropertyGroup>
     <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
         <PlatformTarget>AnyCPU</PlatformTarget>
@@ -37,6 +37,7 @@
         <Reference Include="HunterPie, Version=1.0.3.9806, Culture=neutral, PublicKeyToken=null">
           <HintPath>..\..\HunterPie\HunterPie\bin\Debug\HunterPie.exe</HintPath>
         </Reference>
+        <Reference Include="mscorlib" />
         <Reference Include="Newtonsoft.Json, Version=12.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed">
           <HintPath>..\Plugin.Sync\bin\Release\Newtonsoft.Json.dll</HintPath>
         </Reference>
@@ -47,6 +48,10 @@
         <Reference Include="System" />
         <Reference Include="System.Core" />
         <Reference Include="System.Data" />
+        <Reference Include="System.Threading.Tasks.Dataflow, Version=5.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+          <HintPath>..\packages\System.Threading.Tasks.Dataflow.5.0.0\lib\net461\System.Threading.Tasks.Dataflow.dll</HintPath>
+          <Private>True</Private>
+        </Reference>
         <Reference Include="System.Xml" />
         <Reference Include="xunit.abstractions, Version=2.0.0.0, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c">
             <HintPath>..\packages\xunit.abstractions.2.0.0\lib\net35\xunit.abstractions.dll</HintPath>
@@ -62,9 +67,12 @@
         </Reference>
     </ItemGroup>
     <ItemGroup>
+        <Compile Include="Integration\BaseTests.cs" />
         <Compile Include="Integration\MockGenerator.cs" />
+        <Compile Include="Integration\SyncServiceTests.cs" />
         <Compile Include="Integration\WebsocketsTests.cs" />
         <Compile Include="Properties\AssemblyInfo.cs" />
+        <Compile Include="SerializationTests.cs" />
         <Compile Include="StateMachineTests.cs" />
         <Compile Include="TestOutputLogger.cs" />
     </ItemGroup>

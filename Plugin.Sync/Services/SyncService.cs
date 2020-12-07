@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net.Http;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
 using Plugin.Sync.Connectivity;
 using Plugin.Sync.Connectivity.Model;
 using Plugin.Sync.Model;
@@ -56,18 +57,56 @@ namespace Plugin.Sync.Services
 
     public class SyncService
     {
-        private static readonly Version RequiredApiVersion = new Version(0, 1);
+        public static readonly Version RequiredApiVersion = new Version(0, 1);
         
+        private static readonly IClassLogger Logger = LogManager.GetCurrentClassLogger();
+
         private readonly StateMachine<State, Trigger> stateMachine;
-        private readonly DomainWebsocketClient websocketClient;
-        private CancellationTokenSource currentOperationCts = new CancellationTokenSource();
+        private readonly IDomainWebsocketClient websocketClient;
 
         private readonly PollService poll;
         private readonly PushService push;
-        
+
         private string sessionId;
+
+        private readonly object triggerLoopTaskLocker = new object();
+        private Task triggerLoopTask;
+        private readonly SemaphoreSlim connectSemaphore = new SemaphoreSlim(1);
         
-        private readonly object setModeLocker = new object();
+        public volatile string PlayerName;
+        private SyncServiceMode mode;
+        
+        private readonly BufferBlock<Trigger> triggerQueue = new BufferBlock<Trigger>();
+        
+        private readonly OperationScheduler scheduler = new OperationScheduler();
+
+        public SyncService(IDomainWebsocketClient client)
+        {
+            // -- websockets
+            this.websocketClient = client;
+            this.websocketClient.OnMessage += HandleMessage;
+            this.websocketClient.OnConnectionError += OnConnectionError;
+            
+            // -- push/poll
+            this.push = new PushService(this.websocketClient);
+            this.push.OnSendFailed += PushOnOnSendFailed;
+            this.poll = new PollService();
+            
+            // -- state machine
+            this.stateMachine = new StateMachine<State, Trigger>(State.Idle, FiringMode.Queued);
+            this.stateMachine.OnTransitioned(OnTransitioned);
+            this.stateMachine.OnUnhandledTrigger((state, trigger) =>
+            {
+                Logger.Debug($"Unhandled trigger: {trigger} [{state}]");
+            });
+
+            this.VersionFetcher = new HttpVersionFetcher();
+
+            InitStateMachine();
+            this.scheduleStopWatch.Start();
+        }
+
+        public event EventHandler<SyncServiceMode> OnSyncModeChanged;
 
         public string SessionId
         {
@@ -82,32 +121,22 @@ namespace Plugin.Sync.Services
             }
         }
 
-        public SyncServiceMode Mode { get; private set; }
-
-        public SyncService()
+        public SyncServiceMode Mode
         {
-            // -- websockets
-            var msgHandler = new EventMessageHandler();
-            msgHandler.OnMessage += HandleMessage;
-            this.websocketClient = new DomainWebsocketClient(msgHandler, new JsonMessageEncoder());
-            this.websocketClient.OnConnectionError += OnConnectionError;
-            
-            // -- push/poll
-            this.push = new PushService(this.websocketClient);
-            this.push.OnSendFailed += PushOnOnSendFailed;
-            this.poll = new PollService();
-            
-            // -- state machine
-            this.stateMachine = new StateMachine<State, Trigger>(State.Idle, FiringMode.Queued);
-            this.stateMachine.OnTransitioned(OnTransitioned);
-            this.stateMachine.OnUnhandledTrigger((state, trigger) =>
+            get => this.mode;
+            private set
             {
-                Logger.Debug($"Unhandled trigger: {state} {trigger}");
-            });
-
-            InitStateMachine();
+                if (this.mode == value) return;
+                this.mode = value;
+                OnSyncModeChanged?.Invoke(this, value);
+            }
         }
+        public IVersionFetcher VersionFetcher { get; set; }
+        private readonly Stopwatch scheduleStopWatch = new Stopwatch();
 
+        private Func<Task> Sheduled(Action action) => this.scheduler.CreateAction(action);
+        private Func<Task> Sheduled(Func<CancellationToken, Task> action) => this.scheduler.CreateAction(action);
+        
         private void InitStateMachine()
         {
             // common transitions
@@ -123,13 +152,13 @@ namespace Plugin.Sync.Services
             
             // idle
             this.stateMachine.Configure(State.Idle)
-                .OnEntry(() => SetMode(SyncServiceMode.Idle))
+                .OnEntryAsync(Sheduled(() => this.Mode = SyncServiceMode.Idle))
                 .Permit(Trigger.SetPush, State.VersionCheck)
                 .Permit(Trigger.SetPoll, State.VersionCheck);
             
             // version check
             this.stateMachine.Configure(State.VersionCheck)
-                .OnEntryAsync(CheckVersion)
+                .OnEntryAsync(Sheduled(CheckVersion))
                 .OnExit(CancelCurrentOperation)
                 
                 .Permit(Trigger.SetIdle, State.Idle)
@@ -151,7 +180,7 @@ namespace Plugin.Sync.Services
             
             // connecting
             this.stateMachine.Configure(State.Connecting)
-                .OnEntryAsync(Connect)
+                .OnEntryAsync(Sheduled(Connect))
                 .OnExit(CancelCurrentOperation)
                 
                 .Permit(Trigger.Connected, State.RegisterInSession)
@@ -160,7 +189,7 @@ namespace Plugin.Sync.Services
 
             // register in session
             this.stateMachine.Configure(State.RegisterInSession)
-                .OnEntryAsync(SendSessionInfo)
+                .OnEntryAsync(Sheduled(SendSessionInfo))
                 
                 .PermitReentry(Trigger.SessionIdChanged)
                 .PermitReentry(Trigger.SetPush)
@@ -173,7 +202,7 @@ namespace Plugin.Sync.Services
 
             // wait for players
             this.stateMachine.Configure(State.WaitingForPlayers)
-                .OnEntry(WaitForPlayers)
+                .OnEntryAsync(Sheduled(WaitForPlayers))
                 .OnExit(CancelCurrentOperation)
                 
                 .Permit(Trigger.SetIdle, State.Disconnecting)
@@ -184,6 +213,7 @@ namespace Plugin.Sync.Services
 
             // polling
             this.stateMachine.Configure(State.Polling)
+                .OnEntryAsync(Sheduled(() => this.Mode = SyncServiceMode.Poll))
                 .OnExit(CancelCurrentOperation)
                 .OnExit(this.poll.ClearCache)
                 
@@ -196,7 +226,11 @@ namespace Plugin.Sync.Services
 
             // pushing
             this.stateMachine.Configure(State.Pushing)
-                .OnEntry(() => this.push.StartPushLoop(this.sessionId), nameof(PushService.StartPushLoop))
+                .OnEntryAsync(Sheduled(() =>
+                {
+                    this.push.StartPushLoop(this.sessionId);
+                    this.Mode = SyncServiceMode.Push;
+                }), nameof(PushService.StartPushLoop))
                 .OnExit(this.push.StopPushLoop)
                 
                 .Permit(Trigger.SetPoll, State.Polling)
@@ -208,7 +242,7 @@ namespace Plugin.Sync.Services
 
             // reconnecting
             this.stateMachine.Configure(State.Reconnecting)
-                .OnEntryAsync(Connect)
+                .OnEntryAsync(Sheduled(Connect))
                 .OnExit(CancelCurrentOperation)
                 
                 .Permit(Trigger.SetIdle, State.Idle)
@@ -225,7 +259,7 @@ namespace Plugin.Sync.Services
 
             // disconnecting
             this.stateMachine.Configure(State.Disconnecting)
-                .OnEntryAsync(Disconnect)
+                .OnEntryAsync(Sheduled(Disconnect))
                 .OnExit(CancelCurrentOperation)
                 
                 .Permit(Trigger.Disconnected, State.Idle)
@@ -246,73 +280,124 @@ namespace Plugin.Sync.Services
             Fire(Trigger.ConnectionFailed);
         }
 
-        private void OnTransitioned(StateMachine<State, Trigger>.Transition transition)
+        private static void OnTransitioned(StateMachine<State, Trigger>.Transition transition)
         {
             Logger.Log($"{transition.Source} - {transition.Trigger} -> {transition.Destination}");
         }
 
+        #if DEBUG
         public string GetStateMachineGraph() => UmlDotGraph.Format(this.stateMachine.GetInfo());
+        #endif
 
         /// <summary>
         /// Set sync mode (e.g. direction: push/poll). Returns true if changed.
         /// </summary>
-        public bool SetMode(SyncServiceMode mode)
+        public void SetMode(SyncServiceMode mode)
         {
-            lock (this.setModeLocker)
-            {
-                if (this.Mode == mode) return false;
-                this.Mode = mode;
-            }
-
-            switch (mode)
-            {
-                case SyncServiceMode.Idle:
-                    Fire(Trigger.SetIdle);
-                    break;
-                case SyncServiceMode.Poll:
-                    Fire(Trigger.SetPoll);
-                    break;
-                case SyncServiceMode.Push:
-                    Fire(Trigger.SetPush);
-                    break;
-            }
-
-            return true;
+            EnsureTriggerLoop();
+            var trigger = MapModeToTrigger(mode);
+            Fire(trigger);
         }
-        
-        private Task triggerQueueTask = Task.CompletedTask;
 
-        private void Fire(Trigger trigger)
+        private static Trigger MapModeToTrigger(SyncServiceMode mode) => mode switch
         {
-            lock (this.setModeLocker)
+            SyncServiceMode.Idle => Trigger.SetIdle,
+            SyncServiceMode.Poll => Trigger.SetPoll,
+            SyncServiceMode.Push => Trigger.SetPush,
+            _ => throw new Exception("Unknown mode " + mode)
+        };
+
+        private static SyncServiceMode? MapTriggerToMode(Trigger mode) => mode switch
+        {
+            Trigger.SetIdle => SyncServiceMode.Idle,
+            Trigger.SetPoll => SyncServiceMode.Poll,
+            Trigger.SetPush => SyncServiceMode.Push,
+            _ => null
+        };
+
+        private void EnsureTriggerLoop()
+        {
+            if (this.triggerLoopTask == null || this.triggerLoopTask.IsCompleted)
             {
-                this.triggerQueueTask =
-                    this.triggerQueueTask.ContinueWith(_ =>
+                lock (this.triggerLoopTaskLocker)
+                {
+                    if (this.triggerLoopTask == null || this.triggerLoopTask.IsCompleted)
                     {
-                        return this.stateMachine.FireAsync(trigger);
-                    }, TaskScheduler.Default);
+                        Logger.Trace($"LOOP RQ");
+                        this.triggerLoopTask = TriggerQueueLoop(CancellationToken.None);
+                    }
+                }
             }
         }
         
-        public volatile string PlayerName = Guid.NewGuid().ToString();
+        private object messageLocker = new object();
+        
+        private void Fire(Trigger trigger, CancellationToken? token = null)
+        {
+            lock (this.messageLocker)
+            {
+                if (token?.IsCancellationRequested ?? false) return;
+                Logger.Trace($"Fire {trigger}");
+                this.triggerQueue.Post(trigger);
+            }
+        }
+        
+        private void CancelCurrentOperation()
+        {
+            lock (this.messageLocker)
+            {
+                this.scheduler.CancelCurrentAction();
+            }
+        }
 
+        private async Task TriggerQueueLoop(CancellationToken token)
+        {
+            Logger.Trace($"{nameof(TriggerQueueLoop)} start");
+            while (!token.IsCancellationRequested)
+            {
+                var trigger = await this.triggerQueue.ReceiveAsync(token);
+                
+                if (Logger.IsEnabled(LogLevel.Trace))
+                {
+                    Logger.Trace($"Received {trigger} [{this.triggerQueue.Count} in buffer, thread: {Thread.CurrentThread.Name} ({Thread.CurrentThread.ManagedThreadId})]");
+                }
+
+                try
+                {
+                    // not a very good solution. This should change Mode sequentially before running trigger
+                    // so all Set*Mode triggers implicitly contains two actions: 1) set Mode, 2) change state
+                    // therefore if state transition didn't occur, Mode is still changed
+                    var nextMode = MapTriggerToMode(trigger);
+                    if (nextMode != null)
+                    {
+                        this.Mode = (SyncServiceMode) nextMode;
+                    }
+                    
+                    await this.stateMachine.FireAsync(trigger);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error($"Error on handling trigger {trigger} [{this.stateMachine.State}]: {ex}");
+                }
+                Logger.Trace($"{trigger} end");
+            }
+            Logger.Trace($"{nameof(TriggerQueueLoop)} end");
+        }
+        
         public void SetSessionId(string sessionId) => this.SessionId = sessionId;
-        
+
         public void PushMonster(MonsterModel model) => this.push.PushMonster(model);
-        
+
         /// <summary>
         /// Take temporary ownership for cached monsters
         /// </summary>
         public Borrow<List<MonsterModel>> BorrowMonsters() => this.poll.BorrowMonsters();
 
-        private async Task CheckVersion()
+        private async Task CheckVersion(CancellationToken token)
         {
-            var token = this.currentOperationCts.Token;
             try
             {
-                var rsp = await new HttpClient().GetStringAsync($"{ConfigService.Current.ServerUrl}/version");
-                token.ThrowIfCancellationRequested();
-                var apiVersion = Version.Parse(rsp);
+                var apiVersion = await this.VersionFetcher.FetchVersion(token);
                 if (apiVersion.CompareTo(RequiredApiVersion) != 0)
                 {
                     Logger.Warn(
@@ -320,18 +405,17 @@ namespace Plugin.Sync.Services
                     return;
                 }
                 Logger.Log($"API version is ok ({apiVersion})");
-                Fire(Trigger.VersionOk);
+                Fire(Trigger.VersionOk, token);
             }
             catch (OperationCanceledException)
             {
-                Logger.Trace("Cancelled connection");
-                // noting to do
+                Logger.Trace($"{nameof(CheckVersion)} cancelled");
             }
             catch (HttpRequestException ex)
             {
                 Logger.Warn($"Couldn't connect to server. Polling changes will be disabled. Restart application to try again:\n {ex.GetBaseException().Message}");
                 Logger.Debug($"{ex}");
-                Fire(Trigger.SendingError);
+                Fire(Trigger.SendingError, token);
             }
         }
 
@@ -364,38 +448,46 @@ namespace Plugin.Sync.Services
             Fire(msg.PlayersCount > 1 ? Trigger.NotAloneInSession : Trigger.AloneInSession);
         }
 
-        private async Task SendSessionInfo()
+        private async Task SendSessionInfo(CancellationToken token)
         {
             try
             {
                 var isLeader = this.Mode == SyncServiceMode.Push;
-                await this.websocketClient.Send(new SetSessionMessage(this.SessionId, isLeader), this.currentOperationCts.Token);
+                await this.websocketClient.Send(new SetSessionMessage(this.SessionId, isLeader), token);
                 Logger.Log($"Registered in session {this.SessionId} as {(isLeader ? "leader" : "peer")}");
             }
             catch (OperationCanceledException)
             {
-                Logger.Trace("Cancelled send");
-                // nothing to do
+                Logger.Trace($"{nameof(OperationCanceledException)} cancelled");
             }
             catch (Exception ex)
             {
                 Logger.Warn($"Error on registering in session: {ex.Message}");
-                Fire(Trigger.SendingError);
+                Fire(Trigger.SendingError, token);
             }
         }
 
-        private async Task Connect()
+        private async Task Connect(CancellationToken token)
         {
             try
             {
-                var wsUrl = GetWsUrl();
-                Logger.Info($"Connecting to '{wsUrl}'...");
-                await this.websocketClient.AssertConnected(wsUrl, this.PlayerName, this.currentOperationCts.Token);
-                Fire(Trigger.Connected);
+                Logger.Info($"Connecting to '{this.websocketClient.Endpoint}'...");
+                var name = ConfigService.TraceName ?? this.PlayerName;
+                
+                // websocket client is not thread-safe, need to make sure only one connect is active at the time 
+                await this.connectSemaphore.WaitAsync(token);
+                if (await this.websocketClient.AssertConnected(token) && !string.IsNullOrEmpty(name))
+                {
+                    Logger.Debug($"Sending name '{name}'");
+                    var msg = new SetNameMessage(name);
+                    await this.websocketClient.Send(msg, token);
+                }
+
+                Fire(Trigger.Connected, token);
             }
             catch (OperationCanceledException)
             {
-                // nothing to do
+                Logger.Trace($"{nameof(Connect)} cancelled");
             }
             catch (Exception ex)
             {
@@ -406,25 +498,29 @@ namespace Plugin.Sync.Services
                 }
                 finally
                 {
-                    Fire(Trigger.ConnectionFailed);
+                    Fire(Trigger.ConnectionFailed, token);
                 }
+            }
+            finally
+            {
+                this.connectSemaphore.Release();
             }
         }
 
-        private async Task Disconnect()
+        private async Task Disconnect(CancellationToken token)
         {
             try
             {
                 if (this.websocketClient.IsConnected)
                 {
-                    await SendCloseConnection();
+                    await SendCloseConnection(token);
                 }
 
                 await this.websocketClient.Close();
             }
             catch (OperationCanceledException)
             {
-                // nothing to do
+                Logger.Trace($"{nameof(Disconnect)} cancelled");
             }
             catch (Exception ex)
             {
@@ -432,34 +528,34 @@ namespace Plugin.Sync.Services
             }
             finally
             {
-                Fire(Trigger.Disconnected);
+                Fire(Trigger.Disconnected, token);
             }
         }
 
-        private async void WaitForPlayers()
+        private async Task WaitForPlayers(CancellationToken token)
         {
             try
             {
-                await Task.Delay(TimeSpan.FromMinutes(3), this.currentOperationCts.Token);
+                await Task.Delay(TimeSpan.FromMinutes(3), token);
                 Logger.Info("No player connected in 3 minutes, closing connection.");
                 SetMode(SyncServiceMode.Idle);
             }
             catch (OperationCanceledException)
             {
-                // nothing to do
+                Logger.Trace($"{nameof(WaitForPlayers)} cancelled");
             }
         }
 
-        private async Task SendCloseConnection()
+        private async Task SendCloseConnection(CancellationToken token)
         {
             Logger.Debug("Sending leave message");
             try
             {
-                await this.websocketClient.Send(new CloseConnectionMessage(), this.currentOperationCts.Token);
+                await this.websocketClient.Send(new LeaveSessionMessage(), token);
             }
             catch (OperationCanceledException)
             {
-                // nothing to do
+                Logger.Trace($"{nameof(SendCloseConnection)} cancelled");
             }
             catch (Exception ex)
             {
@@ -467,36 +563,6 @@ namespace Plugin.Sync.Services
             }
             Logger.Debug("Sending leave message ok");
         }
-        
-        private void CancelCurrentOperation()
-        {
-            Logger.Trace($"{nameof(CancelCurrentOperation)} state: {this.stateMachine.State} [start]");
-            if (!this.currentOperationCts.IsCancellationRequested)
-            {
-                this.currentOperationCts.Cancel();
-            }
 
-            this.currentOperationCts = new CancellationTokenSource();
-            Logger.Trace($"{nameof(CancelCurrentOperation)} state: {this.stateMachine.State} [end]");
-        }
-        
-        private static string GetWsUrl()
-        {
-            var serverUrl = ConfigService.Current.ServerUrl;
-            if (!serverUrl.StartsWith("http"))
-            {
-                throw new Exception($"Cannot parse server url: '{serverUrl}'");
-            }
-            var sb = new StringBuilder("ws");
-            
-            // removing 'http' part: [http]s://example.com/
-            sb.Append(serverUrl, 4, serverUrl.Length - 4);
-            // adding '/' if missing
-            if (!serverUrl.EndsWith("/")) sb.Append("/");
-            sb.Append("connect");
-            
-            // result: https://example.com -> wss://example.com/connect
-            return sb.ToString();
-        }
     }
 }

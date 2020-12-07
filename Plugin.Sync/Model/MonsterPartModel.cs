@@ -4,9 +4,12 @@ using Plugin.Sync.Util;
 
 namespace Plugin.Sync.Model
 {
+    [JsonArrayObject]
     public class MonsterPartModel : IEquatable<MonsterPartModel>
     {
+        [JsonArrayProp(Index = 0)]
         public int Index { get; set; }
+        [JsonArrayProp(Index = 1)]
         public float Health { get; set; }
 
         public MonsterPartModel Clone()
@@ -14,7 +17,7 @@ namespace Plugin.Sync.Model
             return new MonsterPartModel
             {
                 Index = this.Index,
-                Health = this.Health,
+                Health = this.Health
             };
         }
 

@@ -1,10 +1,18 @@
-﻿using Stateless;
+﻿using Plugin.Sync.Connectivity;
+using Plugin.Sync.Services;
+using Plugin.Sync.Tests.Integration;
+using Stateless;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Plugin.Sync.Tests
 {
-    public class StateMachineTests
+    public class StateMachineTests : BaseTests
     {
+        public StateMachineTests(ITestOutputHelper testOutput) : base(testOutput)
+        {
+        }
+        
         [Fact]
         public void ReenterWillCallExitAndEntry()
         {
@@ -24,6 +32,16 @@ namespace Plugin.Sync.Tests
             
             Assert.Equal(result, "exexe");
         }
-        
+
+        /// <summary>
+        /// Can be visualized using https://dreampuf.github.io/GraphvizOnline/
+        /// </summary>
+        [Fact]
+        public void PrintPollServiceGraph()
+        {
+            var poll = new SyncService(new DomainWebsocketClient(ConfigService.GetWsUrl()));
+            var graph = poll.GetStateMachineGraph();
+            this.TestOutput.WriteLine(graph);
+        }
     }
 }

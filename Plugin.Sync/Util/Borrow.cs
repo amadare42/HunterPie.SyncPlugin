@@ -6,7 +6,6 @@ namespace Plugin.Sync.Util
     /// Represents concept of temporarily taken ownership of locked data.
     /// Until disposed, no external changes are permitted for this data.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
     public class Borrow<T> : IDisposable
     {
         private readonly Action free;

@@ -19,7 +19,7 @@ namespace Plugin.Sync.Services
         
         public event EventHandler<EventArgs> OnSendFailed; 
         
-        private readonly DomainWebsocketClient client;
+        private readonly IDomainWebsocketClient client;
         private readonly DiffService diffService = new DiffService();
 
         /// <summary>
@@ -34,7 +34,7 @@ namespace Plugin.Sync.Services
         private string sessionId;
         private Thread thread;
 
-        public PushService(DomainWebsocketClient client)
+        public PushService(IDomainWebsocketClient client)
         {
             this.client = client;
         }
@@ -78,7 +78,6 @@ namespace Plugin.Sync.Services
                 // this should be done inside of lock, since check & release operation is not atomic
                 if (this.dataAvailableEvent.CurrentCount == 0) this.dataAvailableEvent.Release();
             }
-
         }
         
         private async void PushLoop(CancellationToken token)
@@ -117,7 +116,7 @@ namespace Plugin.Sync.Services
                 }
                 catch (OperationCanceledException)
                 {
-                    // nothing to do
+                    Logger.Trace("PushLoop cancelled");
                 }
                 catch (Exception ex)
                 {

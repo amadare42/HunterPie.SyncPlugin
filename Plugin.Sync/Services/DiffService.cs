@@ -49,7 +49,8 @@ namespace Plugin.Sync.Services
             {
                 Id = newModel.Id,
                 Ailments = newModel.Ailments.Where((upd, idx) => !existing.Ailments[idx].Equals(upd)).ToList(),
-                Parts = newModel.Parts.Where((upd, idx) => !existing.Parts[idx].Equals(upd)).ToList()
+                Parts = newModel.Parts.Where((upd, idx) => !existing.Parts[idx].Equals(upd)).ToList(),
+                // TotalHp = newModel.TotalHp
             };
         }
 

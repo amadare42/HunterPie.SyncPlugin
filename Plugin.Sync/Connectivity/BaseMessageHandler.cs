@@ -12,17 +12,23 @@ namespace Plugin.Sync.Connectivity
     {
         protected const int MaxMessageSize = 16384;
         protected readonly JsonSerializer Serializer;
-        
-        public BaseMessageHandler()
+
+        protected BaseMessageHandler()
         {
-            this.Serializer = new JsonSerializer
+            this.Serializer = CreateSerializer();
+        }
+
+        public static JsonSerializer CreateSerializer()
+        {
+            return new JsonSerializer
             {
                 ContractResolver = new CamelCasePropertyNamesContractResolver(),
-                Converters = 
+                Converters =
                 {
                     // we don't need that level of precision, this will reduce packet size a bit
                     new LimitFloatPrecisionConverter(2),
-                    new Newtonsoft.Json.Converters.StringEnumConverter(new CamelCaseNamingStrategy())
+                    new Newtonsoft.Json.Converters.StringEnumConverter(new CamelCaseNamingStrategy()),
+                    new JsonArrayObjectConverter()
                 }
             };
         }
@@ -40,7 +46,7 @@ namespace Plugin.Sync.Connectivity
             
             try
             {
-                if (this.messageMap.TryGetValue(type.ToLower(), out var msgType))
+                if (this.inboundMessages.TryGetValue(type.ToLower(), out var msgType))
                 {
                     return Parse(jObj, msgType);
                 }
@@ -57,7 +63,7 @@ namespace Plugin.Sync.Connectivity
             }
         }
         
-        private readonly Dictionary<string, Type> messageMap = new Dictionary<string, Type>
+        private readonly Dictionary<string, Type> inboundMessages = new Dictionary<string, Type>
         {
             { MessageCodes.Push.ToLower(), typeof(PushMonstersMessage) },
             { MessageCodes.ServerMsg.ToLower(), typeof(ServerMsg) },

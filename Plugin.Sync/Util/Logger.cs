@@ -1,49 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Net.Http;
+using System.IO;
 using System.Runtime.CompilerServices;
-using System.Text;
 using HunterPie.Logger;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace Plugin.Sync.Util
 {
     public interface ILoggerTarget
     {
         void Log(string message, LogLevel level);
-    }
-
-    public class ServerLoggerTarget : ILoggerTarget
-    {
-        private readonly string user;
-        private HttpClient client = new HttpClient();
-
-        public ServerLoggerTarget(string user)
-        {
-            this.user = user;
-        }
-
-        public async void Log(string message, LogLevel level)
-        {
-            var jObj = new JObject
-            {
-                ["timestamp"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                ["level"] = level.ToString("G"),
-                ["msg"] = message,
-                ["text"] = $"{DateTime.Now:HH:mm:ss:fff} [{level:G}] {message}",
-                ["user"] = this.user
-            };
-            var content = new StringContent(jObj.ToString(), Encoding.UTF8, "application/json");
-            try
-            {
-                await this.client.PostAsync(ConfigService.Current.ServerUrl + "/logs/add", content);
-            }
-            catch (Exception)
-            {
-                // ignored
-            }
-        }
     }
 
     public enum LogLevel
@@ -70,9 +36,16 @@ namespace Plugin.Sync.Util
                     break;
 
                 case LogLevel.Trace:
-                case LogLevel.Debug:
-                case LogLevel.Info:
                     // using Log instead of Debug to be able to show debug messages even when ShowDebugMessages is disabled
+                    Debugger.Log("[TRACE] " + message);
+                    break;
+                
+                case LogLevel.Debug:
+                    // using Log instead of Debug to be able to show debug messages even when ShowDebugMessages is disabled
+                    Debugger.Log("[DEBUG] " + message);
+                    break;
+                
+                case LogLevel.Info:
                     Debugger.Log(message);
                     break;
                 
@@ -80,6 +53,16 @@ namespace Plugin.Sync.Util
                     throw new ArgumentOutOfRangeException(nameof(level), level, null);
             }
         }
+    }
+
+    public static class LoggingExtensions
+    {
+        public static void Info(this ILoggerTarget log, string message) => log.Log(message, LogLevel.Info);
+        public static void Error(this ILoggerTarget log, string message) => log.Log(message, LogLevel.Error);
+        public static void Warn(this ILoggerTarget log, string message) => log.Log(message, LogLevel.Warn);
+        public static void Debug(this ILoggerTarget log, string message) => log.Log(message, LogLevel.Debug);
+        public static void Trace(this ILoggerTarget log, string message) => log.Log(message, LogLevel.Trace);
+        
     }
 
     public class ConsoleTarget : ILoggerTarget
@@ -97,7 +80,50 @@ namespace Plugin.Sync.Util
             Console.WriteLine($"{DateTime.Now:HH:mm:ss:ffff} [{level:G}] {message}");
             Console.ForegroundColor = prevColor;
         }
+    }
 
+    public interface IClassLogger : ILoggerTarget
+    {
+        bool IsEnabled(LogLevel level);
+        void Log(string message);
+    }
+
+    public class ClassLogger : IClassLogger
+    {
+        private readonly string prefix;
+
+        public ClassLogger(string prefix)
+        {
+            this.prefix = prefix;
+        }
+
+        public bool IsEnabled(LogLevel level)
+        {
+            return Logger.IsEnabled(level);
+        }
+
+        public void Log(string message)
+        {
+            Log(message, LogLevel.Info);
+        }
+
+        public void Log(string message, LogLevel level)
+        {
+            #if DEBUG
+            message = $"[{this.prefix}] {message}";
+            #endif
+            Logger.Log(message, level);
+        }
+    }
+
+    public static class LogManager
+    {
+        public static IClassLogger GetCurrentClassLogger([CallerFilePath]string callerFilePath = null, [CallerMemberName]string callerMemberName = null)
+        {
+            var callerTypeName = Path.GetFileNameWithoutExtension(callerFilePath);
+            return new ClassLogger(callerTypeName);
+        }
+        
     }
 
     public static class Logger

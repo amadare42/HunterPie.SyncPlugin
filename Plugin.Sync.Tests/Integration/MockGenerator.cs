@@ -6,7 +6,7 @@ namespace Plugin.Sync.Tests
 {
     public static class MockGenerator
     {
-        private static Random random = new Random();
+        private static readonly Random Random = new Random();
         
         public static MonsterModel GenerateModel()
         {
@@ -22,8 +22,7 @@ namespace Plugin.Sync.Tests
             return new MonsterPartModel
             {
                 Index = idx,
-                Health = random.Next(97, 100),
-                MaxHealth = 100
+                Health = Random.Next(97, 100)
             };
         }
         
