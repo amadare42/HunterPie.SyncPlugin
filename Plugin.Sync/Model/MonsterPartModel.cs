@@ -1,49 +1,30 @@
 ﻿using System;
 using HunterPie.Core;
-using HunterPie.Core.Definitions;
+using Plugin.Sync.Util;
 
 namespace Plugin.Sync.Model
 {
+    [JsonArrayObject]
     public class MonsterPartModel : IEquatable<MonsterPartModel>
     {
-        public float MaxHealth { get; set; }
+        [JsonArrayProp(Index = 0)]
+        public int Index { get; set; }
+        [JsonArrayProp(Index = 1)]
         public float Health { get; set; }
-        public int Counter { get; set; }
-        
-        // TODO: this can be inferred 
-        public bool IsRemovable { get; set; }
-
-        public float TenderizeMaxDuration { get; set; }
-        public float TenderizeDuration { get; set; }
 
         public MonsterPartModel Clone()
         {
             return new MonsterPartModel
             {
-                MaxHealth = this.MaxHealth,
-                Counter = this.Counter,
-                Health = this.Health,
-                IsRemovable = this.IsRemovable,
-                TenderizeDuration = this.TenderizeDuration,
-                TenderizeMaxDuration = this.TenderizeMaxDuration
+                Index = this.Index,
+                Health = this.Health
             };
         }
 
-        public sMonsterPartData ToDomain() => new sMonsterPartData
+        public static MonsterPartModel FromCoreModel(Part p, int index) => new MonsterPartModel
         {
-            MaxHealth = this.MaxHealth, 
-            Health = this.Health, 
-            Counter = this.Counter
-        };
-
-        public static MonsterPartModel FromDomain(Part p) => new MonsterPartModel
-        {
-            Counter = p.BrokenCounter, 
+            Index = index,
             Health = p.Health,
-            IsRemovable = p.IsRemovable, 
-            MaxHealth = p.TotalHealth,
-            TenderizeDuration = p.TenderizeDuration,
-            TenderizeMaxDuration = p.TenderizeMaxDuration
         };
 
         public bool Equals(MonsterPartModel other)
@@ -58,12 +39,8 @@ namespace Plugin.Sync.Model
                 return true;
             }
 
-            return this.MaxHealth.Equals(other.MaxHealth) 
-                   && this.Health.Equals(other.Health) 
-                   && this.Counter == other.Counter 
-                   && this.IsRemovable == other.IsRemovable 
-                   && this.TenderizeMaxDuration.Equals(other.TenderizeMaxDuration) 
-                   && this.TenderizeDuration.Equals(other.TenderizeDuration);
+            return this.Index == other.Index 
+                   && this.Health.EqualsDelta(other.Health, 0.9f);
         }
 
         public override bool Equals(object obj)
@@ -90,12 +67,8 @@ namespace Plugin.Sync.Model
         {
             unchecked
             {
-                var hashCode = this.MaxHealth.GetHashCode();
+                var hashCode = this.Index;
                 hashCode = (hashCode * 397) ^ this.Health.GetHashCode();
-                hashCode = (hashCode * 397) ^ this.Counter;
-                hashCode = (hashCode * 397) ^ this.IsRemovable.GetHashCode();
-                hashCode = (hashCode * 397) ^ this.TenderizeMaxDuration.GetHashCode();
-                hashCode = (hashCode * 397) ^ this.TenderizeDuration.GetHashCode();
                 return hashCode;
             }
         }
