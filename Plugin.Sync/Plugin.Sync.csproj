@@ -15,7 +15,7 @@
     <LangVersion>8</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <PlatformTarget>x64</PlatformTarget>
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
@@ -40,10 +40,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="HunterPie.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-      <HintPath>..\..\HunterPie\HunterPie\bin\Debug\HunterPie.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="Newtonsoft.Json, Version=12.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed">
-      <HintPath>..\..\HunterPie\packages\Newtonsoft.Json.12.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <HintPath>.\HunterPie\libs\HunterPie.Core.dll</HintPath>
+      <HintPath Condition="Exists('.\HunterPie\libs\HunterPie.Core.dll')">.\HunterPie\libs\HunterPie.Core.dll</HintPath>
+      <HintPath Condition="Exists('..\..\HunterPie\HunterPie\bin\Debug\HunterPie.Core.dll')">..\..\HunterPie\HunterPie\bin\Debug\HunterPie.Core.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="WindowsBase" />
@@ -60,7 +59,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Connectivity\BaseMessageHandler.cs" />
+    <Compile Include="Connectivity\DomainWebsocketClient.cs" />
     <Compile Include="Connectivity\EventMessageHandler.cs" />
+    <Compile Include="Connectivity\IDomainWebsocketClient.cs" />
     <Compile Include="Connectivity\IMessageEncoder.cs" />
     <Compile Include="Connectivity\IMessageHandler.cs" />
     <Compile Include="Connectivity\JsonMessageEncoder.cs" />
@@ -76,30 +77,42 @@
     <Compile Include="Connectivity\NullMessageHandler.cs" />
     <Compile Include="Connectivity\QueuedMessageHandler.cs" />
     <Compile Include="Connectivity\WebsocketConnectionFailedException.cs" />
-    <Compile Include="LinqExtensions.cs" />
-    <Compile Include="Services\DiffService.cs" />
-    <Compile Include="Services\HttpVersionFetcher.cs" />
-    <Compile Include="Services\IVersionFetcher.cs" />
-    <Compile Include="Services\PollService.cs" />
-    <Compile Include="Services\PushService.cs" />
+    <Compile Include="Logging\ClassLogger.cs" />
+    <Compile Include="Logging\ConsoleTarget.cs" />
+    <Compile Include="Logging\HunterPieDebugger.cs" />
+    <Compile Include="Logging\IClassLogger.cs" />
+    <Compile Include="Logging\ILoggerTarget.cs" />
+    <Compile Include="Logging\Logger.cs" />
+    <Compile Include="Logging\LoggingExtensions.cs" />
+    <Compile Include="Logging\LogLevel.cs" />
+    <Compile Include="Logging\LogManager.cs" />
+    <Compile Include="Logging\ServerLoggerTarget.cs" />
+    <Compile Include="Poll\PollService.cs" />
+    <Compile Include="Push\DiffService.cs" />
+    <Compile Include="Push\PushService.cs" />
     <Compile Include="SyncPlugin.cs" />
     <Compile Include="ConfigService.cs" />
     <Compile Include="Model\AilmentModel.cs" />
     <Compile Include="Model\MonsterModel.cs" />
     <Compile Include="Model\MonsterPartModel.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Services\SyncService.cs" />
-    <Compile Include="Services\SyncServiceMode.cs" />
+    <Compile Include="Sync\HttpVersionFetcher.cs" />
+    <Compile Include="Sync\IVersionFetcher.cs" />
+    <Compile Include="Sync\OperationScheduler.cs" />
+    <Compile Include="Sync\QueueItem.cs" />
+    <Compile Include="Sync\State.cs" />
+    <Compile Include="Sync\SyncService.cs" />
+    <Compile Include="Sync\SyncService.StateMachine.cs" />
+    <Compile Include="Sync\SyncServiceMode.cs" />
+    <Compile Include="Sync\Trigger.cs" />
     <Compile Include="Util\Borrow.cs" />
     <Compile Include="Util\FloatExtensions.cs" />
     <Compile Include="Util\LimitFloatPrecisionConverter.cs" />
     <Compile Include="Util\JsonArrayObjectConverter.cs" />
-    <Compile Include="Util\ListComparator.cs" />
-    <Compile Include="Util\Logger.cs" />
-    <Compile Include="Util\OperationScheduler.cs" />
+    <Compile Include="Util\LinqExtensions.cs" />
+    <Compile Include="Util\ListComparisonExtensions.cs" />
     <Compile Include="Util\ReflectionsHelper.cs" />
-    <Compile Include="Util\ServerLoggerTarget.cs" />
-    <Compile Include="Util\TransitionInfo.cs" />
+    <Compile Include="Util\StateMachineExtensions.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="module.json">
@@ -109,29 +122,28 @@
   <ItemGroup>
     <PackageReference Include="Costura.Fody" Version="4.1.0" PrivateAssets="All" />
     <PackageReference Include="deniszykov.WebSocketListener" Version="4.2.10" />
-    <PackageReference Include="Fody" Version="6.3.0" PrivateAssets="All">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
+    <PackageReference Include="Newtonsoft.Json" Version="12.*" PrivateAssets="all" />
     <PackageReference Include="Stateless" Version="5.1.5" />
     <PackageReference Include="System.Threading.Tasks.Dataflow" Version="5.0.0" />
   </ItemGroup>  
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PreBuildEvent>powershell.exe -ExecutionPolicy Bypass "$(ProjectDir)build\UpdateAssemblyVersion.ps1" -path '$(ProjectDir)Properties\AssemblyInfo.cs'
-if not %errorlevel% == 0 exit %errorlevel%</PreBuildEvent>
-    <PostBuildEvent>powershell.exe -ExecutionPolicy Bypass "$(ProjectDir)build\PostBuild.ps1" -root '$(TargetDir)'
+    <PreBuildEvent>if not exist "$(ProjectDir)HunterPie\libs\HunterPie.Core.dll" if not exist "$(ProjectDir)..\..\HunterPie\HunterPie\bin\Debug\HunterPie.Core.dll" (
+  echo "HunterPie.Core.dll not found, downloading..."
+  powershell.exe -ExecutionPolicy Bypass "$(ProjectDir)build\Download-HunterPie.ps1" 
+  if not %errorlevel% == 0 exit %errorlevel%
+)
+powershell.exe -ExecutionPolicy Bypass "$(ProjectDir)build\Update-AssemblyVersion.ps1" -path '$(ProjectDir)Properties\AssemblyInfo.cs'
 if not %errorlevel% == 0 exit %errorlevel%
-set modulePath="$(ProjectDir)..\..\HunterPie\HunterPie\bin\$(ConfigurationName)\Modules\$(ProjectName)"
-if not exist "%modulePath%" mkdir %modulePath%
-copy $(TargetDir)$(TargetFileName) "%modulePath%\$(TargetFileName)"
+    </PreBuildEvent>
+    <PostBuildEvent>powershell.exe -ExecutionPolicy Bypass "$(ProjectDir)build\Update-ModuleJson.ps1" -root '$(TargetDir)'
+if not %errorlevel% == 0 exit %errorlevel%
+if exist "$(ProjectDir)..\..\HunterPie\HunterPie\bin\Debug\HunterPie.Core.dll" (
+  echo "copying resulting binaries to HunterPie $(ConfigurationName) directory"
+  set modulePath="$(ProjectDir)..\..\HunterPie\HunterPie\bin\$(ConfigurationName)\Modules\$(ProjectName)"
+  if not exist "%modulePath%" mkdir %modulePath%
+  copy $(TargetDir)$(TargetFileName) "%modulePath%\$(TargetFileName)"
+)
     </PostBuildEvent>
   </PropertyGroup>
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
 </Project>

@@ -1,9 +1,9 @@
 ﻿using System.Collections.Generic;
 using HunterPie.Core;
-using Plugin.Sync.Util;
+using Plugin.Sync.Logging;
 using Xunit.Abstractions;
 
-namespace Plugin.Sync.Tests.Integration
+namespace Plugin.Sync.Tests.Manual
 {
     public class BaseTests
     {
@@ -20,7 +20,7 @@ namespace Plugin.Sync.Tests.Integration
             Logger.LogLevel = LogLevel.Trace;
             ConfigService.Current = new Config
             {
-                ServerUrl = "http://localhost:5001/dev"
+                ServerUrl = "http://localhost:5001"
             };
             UserSettings.PlayerConfig = new UserSettings.Config.Rootobject {Overlay = {GameScanDelay = 150}};
         }

@@ -16,9 +16,6 @@ namespace Plugin.Sync.Model
         
         [JsonArrayProp(Index = 2)]
         public List<AilmentModel> Ailments { get; set; } = new List<AilmentModel>();
-
-        [JsonArrayProp(Index = 3)]
-        public int TotalHp { get; set; }
         
         public void UpdateWith(MonsterModel model)
         {
@@ -36,11 +33,6 @@ namespace Plugin.Sync.Model
                     model.Parts.FirstOrDefault(a => a.Index == i) ?? this.Parts.FirstOrDefault(a => a.Index == i))
                 .Where(e => e != null)
                 .ToList();
-            
-            if (this.TotalHp != 0 && model.TotalHp != 0 && model.TotalHp < this.TotalHp)
-            {
-                this.TotalHp = model.TotalHp;
-            }
         }
 
         public MonsterModel Clone()
@@ -49,8 +41,7 @@ namespace Plugin.Sync.Model
             {
                 Id = this.Id,
                 Parts = this.Parts.Select(p => p.Clone()).ToList(),
-                Ailments = this.Ailments.Select(a => a.Clone()).ToList(),
-                TotalHp = this.TotalHp
+                Ailments = this.Ailments.Select(a => a.Clone()).ToList()
             };
         }
 
@@ -67,7 +58,6 @@ namespace Plugin.Sync.Model
             }
 
             return this.Id == other.Id 
-                   && this.TotalHp == other.TotalHp
                    && this.Parts.AreEqual(other.Parts) 
                    && this.Ailments.AreEqual(other.Ailments);
         }
@@ -98,7 +88,6 @@ namespace Plugin.Sync.Model
             {
                 var hashCode = (this.Id != null ? this.Id.GetHashCode() : 0);
                 hashCode = (hashCode * 397) ^ (this.Parts != null ? this.Parts.GetHashCode() : 0);
-                hashCode = (hashCode * 397) ^ this.TotalHp;
                 hashCode = (hashCode * 397) ^ (this.Ailments != null ? this.Ailments.GetHashCode() : 0);
                 return hashCode;
             }

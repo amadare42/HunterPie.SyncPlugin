@@ -9,6 +9,7 @@ $pattern = '\[assembly: (AssemblyVersion|AssemblyFileVersion)\("(.*)"\)\]'
         $fileVersion = [version]$matches[2]
         $newVersion = "{0}.{1}.{2}.{3}" -f $fileVersion.Major, $fileVersion.Minor, $fileVersion.Build, ($fileVersion.Revision + 1)
         '[assembly: {0}("{1}")]' -f $matches[1], $newVersion
+        Write-Host ('Assembly version updated to {0}' -f $newVersion)
     } else {
         # Output line as is
         $_

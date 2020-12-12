@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
-using Plugin.Sync.Connectivity.Model;
+using Plugin.Sync.Connectivity.Model.Messages;
+using Plugin.Sync.Logging;
 using Plugin.Sync.Util;
 
 namespace Plugin.Sync.Connectivity

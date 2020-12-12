@@ -1,16 +1,26 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
-using Plugin.Sync.Util;
+using Plugin.Sync.Logging;
 
 namespace Plugin.Sync
 {
     public class Config
     {
         public LogLevel LogLevel { get; set; } = LogLevel.Info;
-        public string ServerUrl { get; set; } = "https://amadare-mhw-sync.herokuapp.com/dev";
+        public string ServerUrl { get; set; } = "https://amadare-mhw-sync.herokuapp.com/";
+
+        public ServerLoggingConfig ServerLogging { get; set; } = null;
+    }
+
+    public class ServerLoggingConfig
+    {
+        public bool Enable { get; set; }
+        public string Name { get; set; }
+        public string Room { get; set; }
     }
 
     public static class ConfigService
@@ -36,6 +46,8 @@ namespace Plugin.Sync
                 File.WriteAllText(settingsPath, JsonConvert.SerializeObject(Current, new JsonSerializerSettings
                 {
                     Formatting = Formatting.Indented,
+                    // hack to don't show ServerLogging unless specified
+                    NullValueHandling = NullValueHandling.Ignore,
                     Converters = new JsonConverter[] { new StringEnumConverter() }
                 }));
             }
@@ -70,19 +82,28 @@ namespace Plugin.Sync
         public static void Apply(Config config)
         {
             Logger.LogLevel = config.LogLevel;
-            // for debug
-            var dumpLogsPath = Path.Combine(Path.GetDirectoryName(typeof(ConfigService).Assembly.Location), "dumpLogs");
-            if (File.Exists(dumpLogsPath))
+
+            if (config.ServerLogging != null && config.ServerLogging.Enable)
             {
-                var cfgString = File.ReadAllText(dumpLogsPath);
-                var parts = cfgString.Split('|');
-                var name = parts[0];
-                var room = parts.Length > 1 ? parts[1] : "";
-                
+                var name = string.IsNullOrEmpty(config.ServerLogging.Name)
+                    ? "user-" + Guid.NewGuid().ToString().Substring(0, 4)
+                    : config.ServerLogging.Name;
+                name = name.Substring(0, Math.Min(name.Length, 10));
+                TraceName = name;
+
+                var room = string.IsNullOrEmpty(config.ServerLogging.Room) ? "" : config.ServerLogging.Room;
+                room = room.Substring(0, Math.Min(room.Length, 10));
+
+                var existingLogger = (ServerLoggerTarget) Logger.Targets.FirstOrDefault(l => l.GetType() == typeof(ServerLoggerTarget));
+                if (existingLogger != null)
+                {
+                    Logger.Log("Server logger changed");
+                    var _ = existingLogger.Close();
+                }
                 Logger.Targets.Add(new ServerLoggerTarget(name, room));
-                Logger.Info($"Using server logging as '{cfgString}' (room: '{room}')");
-                TraceName = cfgString;
+                Logger.Info($"Using server logging as '{name}' (room: '{room}')");
             }
+            
             Logger.Log($"Using server {Current.ServerUrl}; logs level is {Current.LogLevel:G}; [Version: {typeof(ConfigService).Assembly.GetName().Version}]");
         }
     }

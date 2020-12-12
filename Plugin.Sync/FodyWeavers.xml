@@ -1,3 +1,6 @@
 ﻿<Weavers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="FodyWeavers.xsd">
-  <Costura IncludeAssemblies="deniszykov.WebSocketListener|Stateless|System.Threading.Tasks.Dataflow" />
+  <!-- 
+  deniszykov.WebSocketListener library cannot be resolved in HunterPie when included in result binary. 
+  Maybe because it targets different framework version. Further investigation needed.  -->
+  <Costura IncludeAssemblies="Stateless|System.Threading.Tasks.Dataflow" />
 </Weavers>

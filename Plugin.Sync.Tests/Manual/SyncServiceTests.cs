@@ -4,13 +4,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using Plugin.Sync.Connectivity;
-using Plugin.Sync.Connectivity.Model;
-using Plugin.Sync.Services;
+using Plugin.Sync.Connectivity.Model.Messages;
+using Plugin.Sync.Logging;
+using Plugin.Sync.Sync;
 using Plugin.Sync.Util;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Plugin.Sync.Tests.Integration
+namespace Plugin.Sync.Tests.Manual
 {
     public class SyncServiceTests : BaseTests
     {
@@ -30,7 +31,7 @@ namespace Plugin.Sync.Tests.Integration
             }, "Foo");
             await foo();
             Assert.Equal("Foo", foo.Method.Name);
-            Assert.Equal(true, executed);
+            Assert.True(executed);
         }
 
         [Fact]
@@ -60,37 +61,6 @@ namespace Plugin.Sync.Tests.Integration
                 }))
                 .ToArray();
             Task.WaitAll(tasks);
-        }
-
-        [Fact]
-        public async Task ShouldWork()
-        {
-            var wsClient = new FakeDomainWebsocketClient();
-            var versionFetcher = new FakeVersionFetcher();
-            var syncService = new SyncService(wsClient)
-            {
-                SessionId = "test-id",
-                VersionFetcher = versionFetcher
-            };
-            var modes = new BufferBlock<SyncServiceMode>();
-            syncService.OnSyncModeChanged += (sender, mode) =>
-            {
-                Logger.Debug("== Mode: " + mode);
-                modes.Post(mode);
-            };
-
-            var i = 0;
-            async Task SetMode(SyncServiceMode mode)
-            {
-                var j = ++i;
-                Logger.Debug($"  --> {mode:G} {j}");
-                syncService.SetMode(mode);
-                await Task.Yield();
-            }
-            
-            
-            
-            
         }
 
         [Fact]
@@ -173,18 +143,18 @@ namespace Plugin.Sync.Tests.Integration
         }
         public async Task<bool> AssertConnected(CancellationToken cancellationToken)
         {
-            await taskCompletionSource.Task;
+            await this.taskCompletionSource.Task;
             return true;
         }
 
         public Task Send<T>(T dto, CancellationToken cancellationToken) where T : IMessage
         {
-            return taskCompletionSource.Task;
+            return this.taskCompletionSource.Task;
         }
 
         public Task Close()
         {
-            return taskCompletionSource.Task;
+            return this.taskCompletionSource.Task;
         }
     }
 }

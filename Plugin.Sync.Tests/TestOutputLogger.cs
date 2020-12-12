@@ -1,5 +1,5 @@
 ﻿using System;
-using Plugin.Sync.Util;
+using Plugin.Sync.Logging;
 using Xunit.Abstractions;
 
 namespace Plugin.Sync.Tests

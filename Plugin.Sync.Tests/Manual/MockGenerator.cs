@@ -2,7 +2,7 @@
 using System.Linq;
 using Plugin.Sync.Model;
 
-namespace Plugin.Sync.Tests
+namespace Plugin.Sync.Tests.Manual
 {
     public static class MockGenerator
     {
@@ -25,15 +25,5 @@ namespace Plugin.Sync.Tests
                 Health = Random.Next(97, 100)
             };
         }
-        
-        // private static MonsterPartModel GeneratePart(int idx)
-        // {
-        //     return new MonsterPartModel
-        //     {
-        //         Index = idx,
-        //         Health = (float) random.NextDouble() + random.Next(100, 2000),
-        //         MaxHealth = (float) random.NextDouble() + random.Next(100, 2000)
-        //     };
-        // }
     }
 }

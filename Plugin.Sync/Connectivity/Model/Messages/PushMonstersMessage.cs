@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using Plugin.Sync.Model;
 
-namespace Plugin.Sync.Connectivity.Model
+namespace Plugin.Sync.Connectivity.Model.Messages
 {
     public class PushMonstersMessage : IMessage
     {

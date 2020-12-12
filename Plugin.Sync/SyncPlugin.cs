@@ -4,9 +4,9 @@ using HunterPie.Core;
 using HunterPie.Core.Events;
 using HunterPie.Plugins;
 using Plugin.Sync.Connectivity;
+using Plugin.Sync.Logging;
 using Plugin.Sync.Model;
-using Plugin.Sync.Services;
-using Plugin.Sync.Util;
+using Plugin.Sync.Sync;
 
 namespace Plugin.Sync
 {
@@ -18,16 +18,12 @@ namespace Plugin.Sync
 
         private readonly SyncService syncService;
 
-        private readonly Action<Monster, int> updateMonsterHealth;
-
         public SyncPlugin()
         {
             ConfigService.Load();
             var wsClient = new DomainWebsocketClient(ConfigService.GetWsUrl());
             this.syncService = new SyncService(wsClient);
             this.syncService.OnSyncModeChanged += OnSyncModeChanged;
-
-            this.updateMonsterHealth = ReflectionsHelper.CreateUpdateMonsterHealth();
         }
 
         public void Initialize(Game context)
@@ -180,7 +176,7 @@ namespace Plugin.Sync
             }
         }
 
-        private void UpdateFromMonsterModel(Monster monster, MonsterModel monsterModel)
+        private static void UpdateFromMonsterModel(Monster monster, MonsterModel monsterModel)
         {
             if (monster.Parts.Count == 0 || monster.Ailments.Count == 0)
             {
@@ -205,11 +201,6 @@ namespace Plugin.Sync
                     monster.Ailments[i].Buildup = upd.Buildup;
                 }
             }
-
-            // if (monsterModel.TotalHp != 0 && monster.Health > monsterModel.TotalHp)
-            // {
-            //     this.updateMonsterHealth(monster, monsterModel.TotalHp);
-            // }
         }
         
         private static MonsterModel MapMonster(Monster monster)
@@ -217,9 +208,8 @@ namespace Plugin.Sync
             return new MonsterModel
             {
                 Id = monster.Id,
-                Parts = monster.Parts.Select(MonsterPartModel.FromDomain).ToList(),
-                Ailments = monster.Ailments.Select(AilmentModel.FromDomain).ToList(),
-                TotalHp = (int)monster.Health
+                Parts = monster.Parts.Select(MonsterPartModel.FromCoreModel).ToList(),
+                Ailments = monster.Ailments.Select(AilmentModel.FromCoreModel).ToList()
             };
         }
     }

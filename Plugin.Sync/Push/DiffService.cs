@@ -2,7 +2,7 @@
 using System.Linq;
 using Plugin.Sync.Model;
 
-namespace Plugin.Sync.Services
+namespace Plugin.Sync.Push
 {
     /// <summary>
     /// Stateful service that will generate models that only contains differences between latest and provided models.
@@ -49,8 +49,7 @@ namespace Plugin.Sync.Services
             {
                 Id = newModel.Id,
                 Ailments = newModel.Ailments.Where((upd, idx) => !existing.Ailments[idx].Equals(upd)).ToList(),
-                Parts = newModel.Parts.Where((upd, idx) => !existing.Parts[idx].Equals(upd)).ToList(),
-                // TotalHp = newModel.TotalHp
+                Parts = newModel.Parts.Where((upd, idx) => !existing.Parts[idx].Equals(upd)).ToList()
             };
         }
 

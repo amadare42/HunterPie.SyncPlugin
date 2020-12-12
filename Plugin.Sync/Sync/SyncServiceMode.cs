@@ -1,4 +1,4 @@
-﻿namespace Plugin.Sync.Services
+﻿namespace Plugin.Sync.Sync
 {
     public enum SyncServiceMode
     {

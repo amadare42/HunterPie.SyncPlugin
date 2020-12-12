@@ -21,7 +21,7 @@ namespace Plugin.Sync.Model
             };
         }
 
-        public static MonsterPartModel FromDomain(Part p, int index) => new MonsterPartModel
+        public static MonsterPartModel FromCoreModel(Part p, int index) => new MonsterPartModel
         {
             Index = index,
             Health = p.Health,

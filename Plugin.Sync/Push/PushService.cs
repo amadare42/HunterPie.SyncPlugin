@@ -7,11 +7,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using HunterPie.Core;
 using Plugin.Sync.Connectivity;
-using Plugin.Sync.Connectivity.Model;
+using Plugin.Sync.Connectivity.Model.Messages;
+using Plugin.Sync.Logging;
 using Plugin.Sync.Model;
-using Plugin.Sync.Util;
 
-namespace Plugin.Sync.Services
+namespace Plugin.Sync.Push
 {
     public class PushService
     {
@@ -53,6 +53,7 @@ namespace Plugin.Sync.Services
         {
             this.cancellationTokenSource.Cancel();
             this.cancellationTokenSource = new CancellationTokenSource();
+            this.thread?.Join();
             ClearCache();
         }
         
@@ -95,6 +96,7 @@ namespace Plugin.Sync.Services
                     token.ThrowIfCancellationRequested();
 
                     // wait for changes to appear
+                    // TODO: rewrite using dataflow
                     await this.dataAvailableEvent.WaitAsync(token);
                     var monsters = ConsumeQueue();
                     if (!monsters.Any())

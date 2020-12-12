@@ -1,4 +1,4 @@
-﻿namespace Plugin.Sync.Connectivity.Model
+﻿namespace Plugin.Sync.Connectivity.Model.Messages
 {
     public class LeaveSessionMessage : IMessage
     {

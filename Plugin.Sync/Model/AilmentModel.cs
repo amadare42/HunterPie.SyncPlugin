@@ -13,7 +13,7 @@ namespace Plugin.Sync.Model
         [JsonArrayProp(Index = 1)]
         public float Buildup { get; set; }
 
-        public static AilmentModel FromDomain(Ailment a, int ailmentIndex) => new AilmentModel
+        public static AilmentModel FromCoreModel(Ailment a, int ailmentIndex) => new AilmentModel
         {
             Index = ailmentIndex,
             Buildup = a.Buildup

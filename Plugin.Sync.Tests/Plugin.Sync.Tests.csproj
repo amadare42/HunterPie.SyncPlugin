@@ -34,46 +34,27 @@
         <WarningLevel>4</WarningLevel>
     </PropertyGroup>
     <ItemGroup>
-        <Reference Include="HunterPie, Version=1.0.3.9806, Culture=neutral, PublicKeyToken=null">
-          <HintPath>..\..\HunterPie\HunterPie\bin\Debug\HunterPie.exe</HintPath>
+        <Reference Include="HunterPie.Core, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+            <HintPath>.\HunterPie\libs\HunterPie.Core.dll</HintPath>
+            <HintPath Condition="Exists('.\HunterPie\libs\HunterPie.Core.dll')">.\HunterPie\libs\HunterPie.Core.dll</HintPath>
+            <HintPath Condition="Exists('..\..\HunterPie\HunterPie\bin\Debug\HunterPie.Core.dll')">..\..\HunterPie\HunterPie\bin\Debug\HunterPie.Core.dll</HintPath>
+            <Private>True</Private>
         </Reference>
         <Reference Include="mscorlib" />
-        <Reference Include="Newtonsoft.Json, Version=12.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed">
-          <HintPath>..\Plugin.Sync\bin\Release\Newtonsoft.Json.dll</HintPath>
-        </Reference>
-        <Reference Include="Stateless, Version=4.0.0.0, Culture=neutral, PublicKeyToken=93038f0927583c9a">
-          <HintPath>..\packages\Stateless.5.1.5\lib\net472\Stateless.dll</HintPath>
-          <Private>True</Private>
-        </Reference>
         <Reference Include="System" />
         <Reference Include="System.Core" />
         <Reference Include="System.Data" />
-        <Reference Include="System.Threading.Tasks.Dataflow, Version=5.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
-          <HintPath>..\packages\System.Threading.Tasks.Dataflow.5.0.0\lib\net461\System.Threading.Tasks.Dataflow.dll</HintPath>
-          <Private>True</Private>
-        </Reference>
         <Reference Include="System.Xml" />
-        <Reference Include="xunit.abstractions, Version=2.0.0.0, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c">
-            <HintPath>..\packages\xunit.abstractions.2.0.0\lib\net35\xunit.abstractions.dll</HintPath>
-        </Reference>
-        <Reference Include="xunit.assert, Version=2.1.0.3179, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c">
-            <HintPath>..\packages\xunit.assert.2.1.0\lib\dotnet\xunit.assert.dll</HintPath>
-        </Reference>
-        <Reference Include="xunit.core, Version=2.1.0.3179, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c">
-            <HintPath>..\packages\xunit.extensibility.core.2.1.0\lib\dotnet\xunit.core.dll</HintPath>
-        </Reference>
-        <Reference Include="xunit.execution.desktop, Version=2.1.0.3179, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c">
-            <HintPath>..\packages\xunit.extensibility.execution.2.1.0\lib\net45\xunit.execution.desktop.dll</HintPath>
-        </Reference>
     </ItemGroup>
     <ItemGroup>
-        <Compile Include="Integration\BaseTests.cs" />
-        <Compile Include="Integration\MockGenerator.cs" />
-        <Compile Include="Integration\SyncServiceTests.cs" />
-        <Compile Include="Integration\WebsocketsTests.cs" />
+        <Compile Include="Manual\BaseTests.cs" />
+        <Compile Include="Manual\LoggingTests.cs" />
+        <Compile Include="Manual\MockGenerator.cs" />
+        <Compile Include="Manual\StateMachineTests.cs" />
+        <Compile Include="Manual\SyncServiceTests.cs" />
+        <Compile Include="Manual\WebsocketsTests.cs" />
         <Compile Include="Properties\AssemblyInfo.cs" />
         <Compile Include="SerializationTests.cs" />
-        <Compile Include="StateMachineTests.cs" />
         <Compile Include="TestOutputLogger.cs" />
     </ItemGroup>
     <ItemGroup>
@@ -83,8 +64,19 @@
       </ProjectReference>
     </ItemGroup>
     <ItemGroup>
-      <None Include="packages.config" />
-    </ItemGroup>
+      <PackageReference Include="Newtonsoft.Json" Version="12.*" />
+      <PackageReference Include="Stateless" Version="5.1.5" />
+      <PackageReference Include="System.Threading.Tasks.Dataflow" Version="5.0.0" />
+      <PackageReference Include="xunit" Version="2.3.1" />
+      <PackageReference Include="xunit.abstractions" Version="2.0.3" />
+      <PackageReference Include="xunit.analyzers" Version="0.7.0" />
+      <PackageReference Include="xunit.assert" Version="2.3.1" />
+      <PackageReference Include="xunit.core" Version="2.3.1" />
+      <PackageReference Include="xunit.extensibility.core" Version="2.3.1" />
+      <PackageReference Include="xunit.extensibility.execution" Version="2.3.1" />
+      <PackageReference Include="xunit.runner.console" Version="2.3.1" />
+      <PackageReference Include="xunit.runner.visualstudio" Version="2.3.1" />
+      </ItemGroup>
     <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
     <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
          Other similar extension points exist, see Microsoft.Common.targets.

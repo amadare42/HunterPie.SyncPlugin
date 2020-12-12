@@ -1,6 +1,6 @@
-﻿using Plugin.Sync.Util;
+﻿using Plugin.Sync.Logging;
 
-namespace Plugin.Sync.Connectivity.Model
+namespace Plugin.Sync.Connectivity.Model.Messages
 {
     public class ServerMsg : IMessage
     {

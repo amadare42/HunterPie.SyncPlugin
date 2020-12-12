@@ -2,8 +2,11 @@
 
 namespace Plugin.Sync.Util
 {
-    public static class ListComparator
+    public static class ListComparisonExtensions
     {
+        /// <summary>
+        /// Ensures lists are sequentially equal.
+        /// </summary>
         public static bool AreEqual<T>(this IList<T> a, IList<T> b)
         {
             if (a == null || b == null)

@@ -1,8 +1,7 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Plugin.Sync.Connectivity.Model;
-using Plugin.Sync.Util;
+using Plugin.Sync.Logging;
 using vtortola.WebSockets;
 using vtortola.WebSockets.Deflate;
 using vtortola.WebSockets.Rfc6455;
@@ -10,64 +9,23 @@ using WebSocket = vtortola.WebSockets.WebSocket;
 
 namespace Plugin.Sync.Connectivity
 {
-    public interface IDomainWebsocketClient
-    {
-        event EventHandler<Exception> OnConnectionError;
-        event EventHandler<IMessage> OnMessage; 
-        bool IsConnected { get; }
-        Uri Endpoint { get; }
-        Task<bool> AssertConnected(CancellationToken cancellationToken);
-        Task Send<T>(T dto, CancellationToken cancellationToken) where T : IMessage;
-        Task Close();
-    }
-
-    public class DomainWebsocketClient : IDomainWebsocketClient
-    {
-        public event EventHandler<Exception> OnConnectionError
-        {
-            add => this.client.OnConnectionError += value;
-            remove => this.client.OnConnectionError -= value;
-        }
-        
-        public event EventHandler<IMessage> OnMessage
-        {
-            add => this.msgHandler.OnMessage += value;
-            remove => this.msgHandler.OnMessage -= value;
-        }
-        
-        public bool IsConnected => this.client.IsConnected;
-        public Uri Endpoint => this.client.Endpoint;
-
-        private readonly WebsocketClientWrapper client;
-        private readonly EventMessageHandler msgHandler;
-
-        public DomainWebsocketClient(string endpoint)
-        {
-            var uri = new UriBuilder(endpoint).Uri;
-            this.msgHandler = new EventMessageHandler();
-            this.client = new WebsocketClientWrapper(uri, this.msgHandler, new JsonMessageEncoder());
-        }
-
-        public Task<bool> AssertConnected(CancellationToken cancellationToken) => this.client.AssertConnected(cancellationToken);
-
-        public Task Send<T>(T dto, CancellationToken cancellationToken) where T : IMessage => this.client.Send(dto, cancellationToken);
-
-        public Task Close() => this.client.Close();
-    }
-    
     /// <summary>
-    /// Wraps Websockets transport details such as ping-ponging, reconnect, receiving and sending messages. 
-    /// NOTE: this class is not thread-safe by design. Should be used with locks.
+    /// Wraps Websockets transport details such as ping-ponging, reconnect, receiving and sending messages.
     /// </summary>
     public class WebsocketClientWrapper : IDisposable
     {
+        private static readonly IClassLogger Logger = LogManager.CreateLogger("WS");
+        
         private readonly IMessageHandler messageHandler;
         private readonly IMessageEncoder encoder;
         private WebSocketClient client;
         private WebSocket wsClient;
+        private readonly WebSocketListenerOptions options;
+        
+        private Task messageLoopTask = Task.CompletedTask;
         private CancellationTokenSource receiveMessagesCts = new CancellationTokenSource();
-        private WebSocketListenerOptions options;
-        private Task ListenLoopTask = Task.CompletedTask;
+        
+        private readonly SemaphoreSlim semaphore = new SemaphoreSlim(1);
 
         public event EventHandler<Exception> OnConnectionError;
 
@@ -107,11 +65,25 @@ namespace Plugin.Sync.Connectivity
         /// <exception cref="WebsocketConnectionFailedException"></exception>
         public async Task<bool> AssertConnected(CancellationToken cancellationToken)
         {
+            try
+            {
+                await this.semaphore.WaitAsync(cancellationToken);
+                return await InternalAssertConnected(cancellationToken);
+            }
+            finally
+            {
+                this.semaphore.Release();
+            }
+        }
+
+        private async Task<bool> InternalAssertConnected(CancellationToken cancellationToken)
+        {
             if (this.client != null 
                 && this.wsClient != null 
                 && this.wsClient.IsConnected 
                 && !this.receiveMessagesCts.IsCancellationRequested)
             {
+                Logger.Trace("Already connected");
                 return false;
             }
             
@@ -121,11 +93,14 @@ namespace Plugin.Sync.Connectivity
                 try
                 {
                     this.receiveMessagesCts.Cancel();
+                    await this.messageLoopTask;
+                    Logger.Trace("Message loop task finished");
                     this.receiveMessagesCts = new CancellationTokenSource();
                     
                     this.client = new WebSocketClient(this.options);
                     this.wsClient = await this.client.ConnectAsync(this.Endpoint, cancellationToken);
-                    _ = Task.Run(() => ReceiveMessagesLoop(this.receiveMessagesCts.Token), cancellationToken);
+                    this.messageLoopTask = Task.Run(() => ReceiveMessagesLoop(this.receiveMessagesCts.Token), cancellationToken);
+                    
                     Logger.Log("Connected to server");
                     return true;
                 }
@@ -150,70 +125,98 @@ namespace Plugin.Sync.Connectivity
         /// <exception cref="Exception"></exception>
         public async Task Send<T>(T dto, CancellationToken cancellationToken)
         {
-            if (!this.IsConnected)
+            try
             {
-                throw new Exception("Client isn't connected!");
+                await this.semaphore.WaitAsync(cancellationToken);
+                if (!this.IsConnected)
+                {
+                    throw new Exception("Client isn't connected!");
+                }
+
+                var (buffer, len) = this.encoder.EncodeMessage(dto);
+                await this.wsClient.WriteStringAsync(buffer, 0, len, cancellationToken);
             }
-            var (buffer, len) = this.encoder.EncodeMessage(dto);
-            await this.wsClient.WriteStringAsync(buffer, 0, len, cancellationToken);
+            finally
+            {
+                this.semaphore.Release();
+            }
         }
 
         public async Task Close()
         {
-            Logger.Debug("Called close");
             try
             {
-                if (this.wsClient != null && this.wsClient.IsConnected)
+                await this.semaphore.WaitAsync();
+                Logger.Debug("Called websockets close");
+                try
                 {
-                    await this.client.CloseAsync();
+                    if (this.wsClient != null && this.wsClient.IsConnected)
+                    {
+                        await this.client.CloseAsync();
+                    }
                 }
-            }
-            catch (Exception)
-            {
-                // client doesn't expose any properties to know if it is safe to close,
-                // so we'll just swallow this exception
-            }
+                catch (Exception)
+                {
+                    // client doesn't expose any properties to know if it is safe to close,
+                    // so we'll just swallow this exception
+                }
 
-            if (!this.receiveMessagesCts.IsCancellationRequested)
-            {
-                this.receiveMessagesCts.Cancel();
-            }
+                if (!this.receiveMessagesCts.IsCancellationRequested)
+                {
+                    this.receiveMessagesCts.Cancel();
+                }
 
-            this.receiveMessagesCts = new CancellationTokenSource();
+                this.receiveMessagesCts = new CancellationTokenSource();
+            }
+            finally
+            {
+                this.semaphore.Release();
+            }
         }
 
         private async void ReceiveMessagesLoop(CancellationToken token)
         {
             Logger.Debug("WS message loop started.");
-            while (!token.IsCancellationRequested)
+            try
             {
-                try
+                while (!token.IsCancellationRequested)
                 {
-                    var responseStream = await this.wsClient.ReadMessageAsync(token).ConfigureAwait(false);
-                    Logger.Trace("WS stream.");
-                    if (responseStream == null) continue;
-                    this.messageHandler.ReceiveMessage(responseStream);
-                }
-                catch (WebSocketException ex)
-                {
-                    this.OnConnectionError?.Invoke(this, ex);
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    Logger.Warn($"Error on receiving message: {ex.Message}");
-                    Logger.Debug($"{ex}");
                     try
                     {
-                        await Task.Delay(1000, token);
+                        var responseStream = await this.wsClient.ReadMessageAsync(token).ConfigureAwait(false);
+                        Logger.Trace("WS stream.");
+                        if (responseStream == null) continue;
+                        this.messageHandler.ReceiveMessage(responseStream);
+                    }
+                    catch (WebSocketException ex)
+                    {
+                        this.OnConnectionError?.Invoke(this, ex);
+                        return;
                     }
                     catch (OperationCanceledException)
                     {
-                        // will return normally
+                        Logger.Trace("receive loop cancelled");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warn($"Error on receiving message: {ex.Message}");
+                        Logger.Debug($"{ex}");
+                        try
+                        {
+                            await Task.Delay(1000, token);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            Logger.Trace("reconnect cancelled");
+                            // will return normally
+                        }
                     }
                 }
             }
-            Logger.Debug("WS message loop stopped.");
+            finally
+            {
+                Logger.Debug("WS message loop stopped.");
+            }
         }
         
         public void Dispose()

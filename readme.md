@@ -2,13 +2,11 @@
 
 This is plugin for [HunterPie](https://github.com/Haato3o/HunterPie) that allows syncing monster buildup data from party-leader to other party members using central server.
 
-> NOTE: this is in relatively early stage, but in working state.
-
 ## Installation
 
 1. Drag'n'drop icon below to into HunterPie window:
 
-[<img src="https://raw.githubusercontent.com/amadare42/HunterPie.SyncPlugin/master/readme/plugin.svg">](https://raw.githubusercontent.com/amadare42/HunterPie.SyncPlugin/master/Plugin.Sync/bin/Release/module.json)
+    [<img src="https://raw.githubusercontent.com/amadare42/HunterPie.SyncPlugin/master/readme/plugin.svg">](https://raw.githubusercontent.com/amadare42/HunterPie.SyncPlugin/master/Plugin.Sync/bin/Release/module.json)
 
 2. Restart application
 
@@ -20,9 +18,22 @@ On first run, in plugin directory `config.json` file will be created. It will be
 
 `ServerUrl`: change sync server url. Useful when using local server
 
+It is also possible to configure server logging with `ServerLogging` object:
+```
+{
+    Enable: true,
+    Name: 'your-name',
+    Room: 'room unique id to discern'
+}
+```
+
+**What will be sent to server**: all plugin-related logs that user can see in application, along time, specified name.
+
 ## Build & Debug
 
-Due to HunterPie's plugin system, it can be a bit tricky to conveniently debug and rebuild project. Here are steps that are required to setup your environment to make it somewhat usable:
+Project is dependent on HunterPie.Core.dll binary. It will be referenced from `.\HunterPie\HunterPie.Core.dll` and `..\..\HunterPie\HunterPie\bin\<Debug|Release>\HunterPie.Core.dll` relative to project root (later have higher priority if present). If during build `.\HunterPie\HunterPie.Core.dll` is missing, build script will automatically download latest HunterPie release from GitHub.
+
+In order to debug HunterPie with plugin, following steps may be taken to rebuild plugin on each HunterPie build:
 
 1. Checkout this repository as sibling for HunterPie project repository
 2. Add Plugin.Sync project as reference for HunterPie solution (optional, but highly recommended)
@@ -32,9 +43,6 @@ Due to HunterPie's plugin system, it can be a bit tricky to conveniently debug a
 4. Set "Run the post-build event" value to "Always", so module binaries will be updated for every build
 
 After these steps, you can just edit plugin project inside HunterPie solution and will have latest binaries for each run so it is easily debbuggable.
-
-Synchronization 
-![project structure](./readme/stucture-scheme.svg)
 
 ### module.json can have placeholders that will be populated on build:
 
@@ -47,24 +55,6 @@ Synchronization
 ## Sync server
 Server source and communication protocol documentation can be found in it's [repository](https://github.com/amadare42/HunterPie.SyncPlugin.Server).
 
-Poll (syncing as non-leader party member) operates using state-machine. Chart that describes it:
+Client sync state machine map:
 
-![poll state matchine](./readme/poll-states.svg)
-
-## Limitations and planned improvements
-
-**Ailment buildup**
-
-HunterPie doesn't allow to easily combine ailment timer from peer client with syncing process, so it is fetched from server instead. This increases data usage and makes UI updates less granular.
-
-**Reflections usage**
-
-In order to alter monster update flow, reflections used heavily. This is making updating process slower and less future-proof.
-
-**Convoluted project structure**
-
-Since plugin must have dependency on HunterPie project, it's impossible to just add this as an dependency for it for straight-forward build and debug. If HunterPie will be able to split plugin dependencies that are shared between application and plugin, required structure can be simplified.  
-
-**Server protocol optimization** (DONE!)
-
-**Websockets support** (DONE!)
+![state machine](./readme/sync-scheme.svg)

@@ -1,11 +1,8 @@
-﻿using Plugin.Sync.Connectivity;
-using Plugin.Sync.Services;
-using Plugin.Sync.Tests.Integration;
-using Stateless;
+﻿using Stateless;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Plugin.Sync.Tests
+namespace Plugin.Sync.Tests.Manual
 {
     public class StateMachineTests : BaseTests
     {
@@ -30,9 +27,10 @@ namespace Plugin.Sync.Tests
             stateMachine.Fire("toFoo");
             stateMachine.Fire("toFoo");
             
-            Assert.Equal(result, "exexe");
+            Assert.Equal("exexe", result);
         }
 
+        #if DEBUG
         /// <summary>
         /// Can be visualized using https://dreampuf.github.io/GraphvizOnline/
         /// </summary>
@@ -43,5 +41,6 @@ namespace Plugin.Sync.Tests
             var graph = poll.GetStateMachineGraph();
             this.TestOutput.WriteLine(graph);
         }
+        #endif
     }
 }

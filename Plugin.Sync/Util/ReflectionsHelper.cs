@@ -31,20 +31,5 @@ namespace Plugin.Sync.Util
                 new ParameterExpression[0]
             ).Compile();
         }
-
-        public static Action<Monster, int> CreateUpdateMonsterHealth()
-        {
-            var healthProp = typeof(Monster).GetProperty(nameof(Monster.Health));
-            var percProp = typeof(Monster).GetProperty(nameof(Monster.HPPercentage));
-
-            var setHealth = (Action<Monster, float>)healthProp!.GetSetMethod(true).CreateDelegate(typeof(Action<Monster, float>));
-            var setPerc = (Action<Monster, float>)percProp!.GetSetMethod(true).CreateDelegate(typeof(Action<Monster, float>));
-
-            return (monster, health) =>
-            {
-                setHealth(monster, health);
-                setPerc(monster, monster.Health / monster.MaxHealth == 0 ? 1 : monster.Health / monster.MaxHealth);
-            };
-        }
     }
 }

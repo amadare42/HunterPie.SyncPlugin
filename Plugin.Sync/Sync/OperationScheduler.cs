@@ -1,9 +1,13 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Plugin.Sync.Logging;
 
-namespace Plugin.Sync.Util
+namespace Plugin.Sync.Sync
 {
+    /// <summary>
+    /// Manages async cancellable tasks. Making sure that only one task is executed at a time.
+    /// </summary>
     public class OperationScheduler
     {
         private static readonly IClassLogger Logger = LogManager.GetCurrentClassLogger();
@@ -18,12 +22,19 @@ namespace Plugin.Sync.Util
             return this.currentTask;
         }
 
-        public void CancelCurrentAction()
+        public async void CancelCurrentAction()
         {
-            this.semaphore.Wait();
-            this.cancellationTokenSource.Cancel();
-            Logger.Trace("Cancellation requested");
-            this.cancellationTokenSource = new CancellationTokenSource();
+            await this.semaphore.WaitAsync();
+            if (!this.currentTask.IsCompleted)
+            {
+                this.cancellationTokenSource.Cancel();
+                Logger.Trace("Cancellation requested");
+            }
+            else
+            {
+                Logger.Trace($"No cancellation - operation [{this.actionCounter}] is finished");
+            }
+            
             this.semaphore.Release();
         }
         
@@ -37,7 +48,9 @@ namespace Plugin.Sync.Util
                     await this.semaphore.WaitAsync();
                     Logger.Trace($"Transition [{actionId}] started");
                     await WaitForFinish();
+                    // not cancellable, so new cancellation token isn't created
                     action();
+                    this.currentTask = Task.CompletedTask;
                     Logger.Trace($"Transition [{actionId}] finished");
                 }
                 catch (Exception ex)
@@ -55,7 +68,7 @@ namespace Plugin.Sync.Util
 
             return resultAction;
         }
-
+        
         public Func<Task> CreateAction(Func<CancellationToken, Task> action)
         {
             Func<Task> resultAction = async () =>
@@ -68,6 +81,7 @@ namespace Plugin.Sync.Util
 
                     await WaitForFinish();
 
+                    this.cancellationTokenSource = new CancellationTokenSource();
                     this.currentTask = action(this.cancellationTokenSource.Token)
                         .ContinueWith(OnOperationFinished(actionId));
                 }

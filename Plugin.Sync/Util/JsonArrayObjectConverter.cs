@@ -19,6 +19,7 @@ namespace Plugin.Sync.Util
 
     /// <summary>
     /// Adds support to serialize/deserialize objects to arrays. ( e.g. { foo: 42, bar: 'hello' } to [42,'hello'].
+    /// Only properties marked with JsonArrayProp attribute will be included.
     /// </summary>
     public class JsonArrayObjectConverter : JsonConverter
     {

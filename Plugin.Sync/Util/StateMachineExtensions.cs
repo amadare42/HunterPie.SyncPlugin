@@ -20,7 +20,7 @@ namespace Plugin.Sync.Util
         public Dictionary<TState, string> Destinations  { get; set; } = new Dictionary<TState, string>();
     }
 
-    public static class StateMachineEx
+    public static class StateMachineExtensions
     {
         public static StateMachine<TState, TTrigger>.StateConfiguration Permit<TState, TTrigger>(
             this StateMachine<TState, TTrigger>.StateConfiguration stateMachine,

@@ -2,7 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Plugin.Sync.Services
+namespace Plugin.Sync.Sync
 {
     public interface IVersionFetcher
     {

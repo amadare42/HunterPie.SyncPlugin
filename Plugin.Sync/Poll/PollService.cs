@@ -2,11 +2,12 @@
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
-using Plugin.Sync.Connectivity.Model;
+using Plugin.Sync.Connectivity.Model.Messages;
+using Plugin.Sync.Logging;
 using Plugin.Sync.Model;
 using Plugin.Sync.Util;
 
-namespace Plugin.Sync.Services
+namespace Plugin.Sync.Poll
 {
     public class PollService
     {
