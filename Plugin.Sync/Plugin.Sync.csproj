@@ -139,7 +139,6 @@ if not %errorlevel% == 0 exit %errorlevel%
     <PostBuildEvent>powershell.exe -ExecutionPolicy Bypass "$(ProjectDir)build\Update-ModuleJson.ps1" -root '$(TargetDir)'
 if not %errorlevel% == 0 exit %errorlevel%
 if exist "$(ProjectDir)..\..\HunterPie\HunterPie\bin\Debug\HunterPie.Core.dll" (
-  echo "copying resulting binaries to HunterPie $(ConfigurationName) directory"
   set modulePath="$(ProjectDir)..\..\HunterPie\HunterPie\bin\$(ConfigurationName)\Modules\$(ProjectName)"
   if not exist "%modulePath%" mkdir %modulePath%
   copy $(TargetDir)$(TargetFileName) "%modulePath%\$(TargetFileName)"

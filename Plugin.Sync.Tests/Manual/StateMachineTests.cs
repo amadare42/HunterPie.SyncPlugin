@@ -1,4 +1,6 @@
-﻿using Stateless;
+﻿using Plugin.Sync.Connectivity;
+using Plugin.Sync.Sync;
+using Stateless;
 using Xunit;
 using Xunit.Abstractions;
 
