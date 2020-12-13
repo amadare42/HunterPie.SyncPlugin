@@ -6,7 +6,7 @@ riderModule.iml
 .vs/
 .idea/
 *.DotSettings.user
-!Plugin.Sync.dll
-!deniszykov.WebSocketListener.dll
-!module.json
+!/Plugin.Sync/bin/Release/Plugin.Sync.dll
+!/Plugin.Sync/bin/Release/deniszykov.WebSocketListener.dll
+!/Plugin.Sync/bin/Release/module.json
 /Plugin.Sync/HunterPie/

@@ -2,13 +2,13 @@
     "Name": "Plugin.Sync",
     "Description": "Syncs part damage and ailments buildup from party leader to other members",
     "Author": "Amadare",
-    "Version": "0.2.0.224",
+    "Version": "0.2.0.238",
     "Dependencies": ["deniszykov.WebSocketListener.dll"],
     "Update": {
         "UpdateUrl": "https://raw.githubusercontent.com/amadare42/HunterPie.SyncPlugin/master/Plugin.Sync/bin/Release",
         "MinimumVersion": "1.0.3.99",
         "FileHashes": {
-            "Plugin.Sync.dll": "0.2.0.224",
+            "Plugin.Sync.dll": "0.2.0.238",
             "deniszykov.WebSocketListener.dll": "4.2.10.0"
         }
     }

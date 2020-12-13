@@ -5,7 +5,7 @@ using Plugin.Sync.Connectivity.Model.Messages;
 
 namespace Plugin.Sync.Connectivity
 {
-    public class DomainWebsocketClient : IDomainWebsocketClient
+    internal class DomainWebsocketClient : IDomainWebsocketClient
     {
         public event EventHandler<Exception> OnConnectionError
         {
