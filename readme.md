@@ -17,7 +17,7 @@ Since Monster Hunter World doesn't store monster part HP and ailments buildup fo
 To reduce traffic and server load, connection will not be opened for expeditions with only single member. And client will automatically disconnect if no other members connect in 3 minutes. That because application cannot know if any of them have HunterPie with sync plugin installed.
 
 #### Explanation of whole process (simplified):
-![state machine](./readme/simple sync diagram.svg)
+![state machine](./readme/simple_sync_diagram.svg)
 
 1. Party leader sends session information and waits for server message
 2. Party leader receives message that no other members are present in session, so it waits for others
