@@ -1,4 +1,4 @@
-name: .NET Core Desktop
+name: Build
 
 on:
   push:
@@ -12,7 +12,7 @@ jobs:
 
     strategy:
       matrix:
-        configuration: [Debug, Release]
+        configuration: [Release]
 
     runs-on: windows-latest
 
@@ -37,3 +37,25 @@ jobs:
       run: msbuild $env:Solution_Name /t:Restore /p:Configuration=$env:Configuration
       env:
         Configuration: ${{ matrix.configuration }}
+        
+  publish:
+    needs: build
+    runs-on: windows-latest
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v2
+      with:
+        name: Hunter Pie sync plugin
+  
+    - name: Create release with binaries
+      run: |
+        gh release create test_release -t "Release v_test" \
+          ${Project_Name}/bin/Release/${Project_Name}.dll
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
