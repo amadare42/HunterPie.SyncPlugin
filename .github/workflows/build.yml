@@ -5,6 +5,9 @@ on:
     branches: [ feature/release-pipeline ]
   pull_request:
     branches: [ feature/release-pipeline ]
+    
+env:
+  Project_Name: Plugin.Sync
 
 jobs:
 
@@ -37,6 +40,12 @@ jobs:
       run: msbuild $env:Solution_Name /t:Restore /p:Configuration=$env:Configuration
       env:
         Configuration: ${{ matrix.configuration }}
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: Sync Plugin for Hunter Pie ${{ matrix.configuration }}
+        path: ./Plugin.Sync/bin/Release/*
         
   publish:
     needs: build
