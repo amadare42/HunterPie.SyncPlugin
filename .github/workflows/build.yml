@@ -60,7 +60,7 @@ jobs:
     - name: Download build artifacts
       uses: actions/download-artifact@v2
       with:
-        name: Hunter Pie sync plugin
+        name: Sync Plugin for Hunter Pie Release
   
     - name: Create release with binaries
       run: |
