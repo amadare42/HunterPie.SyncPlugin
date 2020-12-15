@@ -65,6 +65,6 @@ jobs:
     - name: Create release with binaries
       run: |
         gh release create test_release -t "Release v_test" \
-          ${Project_Name}/bin/Release/${Project_Name}.dll
+          ${Project_Name}\bin\Release\${Project_Name}.dll
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
