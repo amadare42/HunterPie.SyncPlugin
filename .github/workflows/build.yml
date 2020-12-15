@@ -1,0 +1,65 @@
+name: Build
+
+on:
+  push:
+    branches: [ feature/release-pipeline ]
+  pull_request:
+    branches: [ feature/release-pipeline ]
+    
+env:
+  Project_Name: Plugin.Sync
+
+jobs:
+
+  build:
+
+    strategy:
+      matrix:
+        configuration: [Release]
+
+    runs-on: windows-latest
+
+    env:
+      Solution_Name: Plugin.Sync.sln
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Setup MSBuild.exe
+      uses: microsoft/setup-msbuild@v1.0.2
+      
+    - name: Build
+      run: msbuild $env:Solution_Name /t:Restore /p:Configuration=$env:Configuration
+      env:
+        Configuration: ${{ matrix.configuration }}
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: Sync Plugin for Hunter Pie ${{ matrix.configuration }}
+        path: ./Plugin.Sync/bin/Release/*
+        
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v2
+      with:
+        name: Sync Plugin for Hunter Pie Release
+  
+    - name: Create release with binaries
+      run: |
+        gh release create test_release -t "Release v_test" \
+          ${Project_Name}/bin/Release/${Project_Name}.dll
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
