@@ -7,6 +7,8 @@ This is plugin for [HunterPie](https://github.com/Haato3o/HunterPie) that allows
 1. Drag'n'drop icon below to into HunterPie window:
 
     [<img src="https://raw.githubusercontent.com/amadare42/HunterPie.SyncPlugin/master/readme/plugin.svg">](https://raw.githubusercontent.com/amadare42/HunterPie.SyncPlugin/master/Plugin.Sync/bin/Release/module.json)
+    
+    > NOTE: if that's doesn't work, click on icon with right mouse button and select "Save Link As". Then dran'n'drop saved file into HunterPie window.
 
 2. Restart application *(there will be notification that will prompt you to do so)*
 
