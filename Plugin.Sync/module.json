@@ -1,5 +1,6 @@
 ﻿{
     "Name": "Plugin.Sync",
+    "DisplayName": "Amadare's Sync Plugin",
     "Description": "Syncs part damage and ailments buildup from party leader to other members",
     "Author": "Amadare",
     "Version": "$version:Plugin.Sync.dll$",
