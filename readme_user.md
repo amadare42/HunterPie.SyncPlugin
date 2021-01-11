@@ -1,6 +1,6 @@
 # Amadare's Sync Plugin
 
-This is plugin allows syncing monster buildup data from party-leader to other party members using central server.
+This plugin allows syncing monster buildup data from party-leader to other party members using central server.
 
 ## How it works
 
