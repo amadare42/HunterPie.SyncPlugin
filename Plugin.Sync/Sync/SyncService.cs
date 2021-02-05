@@ -342,6 +342,15 @@ namespace Plugin.Sync.Sync
         {
             try
             {
+                try
+                {
+                    await this.websocketClient.Send(new LeaveSessionMessage(), cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Debug($"Error on leaving session {ex}");
+                }
+                
                 await this.websocketClient.Close();
             }
             catch (Exception ex)

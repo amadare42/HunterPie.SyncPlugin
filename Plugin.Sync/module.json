@@ -7,7 +7,7 @@
     "Dependencies": ["deniszykov.WebSocketListener.dll"],
     "Update": {
         "UpdateUrl": "https://raw.githubusercontent.com/amadare42/HunterPie.SyncPlugin/$BRANCH$/Plugin.Sync/bin/Release",
-        "MinimumVersion": "1.0.3.99",
+        "MinimumVersion": "1.0.5.0",
         "FileHashes": {
             "Plugin.Sync.dll": "$version:Plugin.Sync.dll$",
             "deniszykov.WebSocketListener.dll": "$version:deniszykov.WebSocketListener.dll$"

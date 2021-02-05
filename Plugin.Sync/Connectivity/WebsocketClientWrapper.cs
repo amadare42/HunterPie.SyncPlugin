@@ -45,9 +45,9 @@ namespace Plugin.Sync.Connectivity
                 SendBufferSize = bufferSize,
                 BufferManager = BufferManager.CreateBufferManager(bufferPoolSize, bufferSize),
                 PingMode = PingMode.LatencyControl,
-                Logger = new LoggerAdapter
+                Logger = new LoggerAdapter(Logger)
                 {
-                    IsDebugEnabled = false,
+                    IsDebugEnabled = Logger.IsEnabled(LogLevel.Trace),
                     IsWarningEnabled = true,
                     IsErrorEnabled = true
                 },
@@ -148,28 +148,37 @@ namespace Plugin.Sync.Connectivity
             {
                 await this.semaphore.WaitAsync();
                 Logger.Debug("Called websockets close");
-                try
-                {
-                    if (this.wsClient != null && this.wsClient.IsConnected)
-                    {
-                        await this.client.CloseAsync();
-                    }
-                }
-                catch (Exception)
-                {
-                    // client doesn't expose any properties to know if it is safe to close,
-                    // so we'll just swallow this exception
-                }
 
+                // Cancel any ongoing operations 
                 if (!this.receiveMessagesCts.IsCancellationRequested)
                 {
                     this.receiveMessagesCts.Cancel();
                 }
-
                 this.receiveMessagesCts = new CancellationTokenSource();
+                
+                // close current connection
+                try
+                {
+                    await this.messageLoopTask;
+                    if (!this.wsClient.IsConnected)
+                    {
+                        Logger.Trace($"Socket already closed.");
+                        return;
+                    }
+                    await this.wsClient.CloseAsync();
+                    this.wsClient.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Debug($"Exception during closing ws: {ex}");
+                    // client doesn't expose any properties to know if it is safe to close,
+                    // so we'll just swallow this exception
+                }
+
             }
             finally
             {
+                this.client = null;
                 this.semaphore.Release();
             }
         }
@@ -228,9 +237,16 @@ namespace Plugin.Sync.Connectivity
     
     public class LoggerAdapter : ILogger
     {
+        private IClassLogger Logger { get; }
+
+        public LoggerAdapter(IClassLogger logger)
+        {
+            this.Logger = logger;
+        }
+
         public void Debug(string message, Exception error = null)
         {
-            Logger.Debug($"{message} {error}");
+            Logger.Trace($"{message} {error}");
         }
 
         public void Warning(string message, Exception error = null)

@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using HunterPie.Core;
 using HunterPie.Core.Events;
 using HunterPie.Plugins;
@@ -17,6 +19,7 @@ namespace Plugin.Sync
         public Game Context { get; set; }
 
         private readonly SyncService syncService;
+        private readonly SemaphoreSlim updateSyncStateSemaphore = new SemaphoreSlim(1);
 
         public SyncPlugin()
         {
@@ -68,8 +71,12 @@ namespace Plugin.Sync
             this.Context = null;
         }
 
-        private void OnZoneChange(object source, EventArgs args)
+        private async void OnZoneChange(object source, EventArgs args)
         {
+            // This is needed because player scan is performed in another thread. And it isn't done yet,
+            // some Context.Player.* data may not be fully initialized yet.
+            await WaitForPlayerScan();
+            
             if (string.IsNullOrEmpty(this.Context?.Player.SessionID) && !(this.Context?.Player.InPeaceZone ?? false))
             {
                 Logger.Debug("Zone changed, but session id is missing. Wait for next event.");
@@ -80,8 +87,37 @@ namespace Plugin.Sync
             }
             else
             {
-                UpdateSyncState("zone change");
+                UpdateSyncState($"zone change ({this.Context?.Player.ZoneName})");
             }
+        }
+
+        /// <summary>
+        /// Hold thread until next player scan is finished.
+        /// </summary>
+        private async Task WaitForPlayerScan()
+        {
+            var semaphore = new SemaphoreSlim(0);
+            void Trigger(object sender, EventArgs args)
+            {
+                if (this.Context?.Player != null)
+                {
+                    this.Context.Player.OnPlayerScanFinished -= Trigger;
+                }
+
+                semaphore.Release();
+            }
+
+            if (this.Context?.Player == null)
+                return;
+
+            this.Context.Player.OnPlayerScanFinished += Trigger;
+
+            var evtReceived = await semaphore.WaitAsync(TimeSpan.FromSeconds(5));
+            if (!evtReceived)
+            {
+                Logger.Warn("Timeout on expecting player scan!");
+            }
+            Logger.Trace("Finished waiting for player scan");
         }
         
         private void OnMemberSpawn(object source, PartyMemberEventArgs args) => UpdateSyncState($"{args.Name} spawn");
@@ -114,7 +150,7 @@ namespace Plugin.Sync
             }
         }
 
-        private bool IsLeader() => this.Context?.Player.PlayerParty.Members.Any(m => m.IsInParty && m.IsMe && m.IsPartyLeader) ?? false;
+        private bool IsLeader() => this.Context?.Player.PlayerParty.IsLocalHost ?? false;
 
         private const int TrainingAreaZoneId = 504;
 
@@ -127,26 +163,42 @@ namespace Plugin.Sync
                                                 && this.Context.Player.PlayerParty.Size > 1;
                                                 #endif
 
+        private void UpdateSessionId()
+        {
+            var playerName = this.Context.Player.PlayerParty.Members.FirstOrDefault(m => m.IsPartyLeader)?.Name;
+            var playerPostfix = playerName != null ? $":{playerName}" : "";
+            var sessionId = $"{this.Context.Player.SessionID}{playerPostfix}";
+            this.syncService.SetSessionId(sessionId);
+        }
+
         private void UpdateSyncState(string trigger)
         {
-            Logger.Log($"Event: {trigger}");
-            this.syncService.SetSessionId(this.Context.Player.SessionID);
-            if (!string.IsNullOrEmpty(this.Context?.Player.Name))
+            this.updateSyncStateSemaphore.Wait();
+            try
             {
-                this.syncService.PlayerName = this.Context.Player.Name;
-            }
+                Logger.Log($"Event: {trigger}");
+                UpdateSessionId();
+                if (!string.IsNullOrEmpty(this.Context?.Player.Name))
+                {
+                    this.syncService.PlayerName = this.Context.Player.Name;
+                }
 
-            if (!IsGameInSyncableState())
-            {
-                this.syncService.SetMode(SyncServiceMode.Idle);
-            } 
-            else if (IsLeader())
-            {
-                this.syncService.SetMode(SyncServiceMode.Push);
+                if (!IsGameInSyncableState())
+                {
+                    this.syncService.SetMode(SyncServiceMode.Idle);
+                }
+                else if (IsLeader())
+                {
+                    this.syncService.SetMode(SyncServiceMode.Push);
+                }
+                else
+                {
+                    this.syncService.SetMode(SyncServiceMode.Poll);
+                }
             }
-            else
+            finally
             {
-                this.syncService.SetMode(SyncServiceMode.Poll);
+                this.updateSyncStateSemaphore.Release();
             }
         }
 

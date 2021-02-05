@@ -19,5 +19,5 @@ using System.Runtime.InteropServices;
 // MINOR - new feature
 // PATCH - new fix/change
 // REV   - sequential increment per build, should be reset after each PATCH, MINOR, MAJOR increase
-[assembly: AssemblyVersion("0.2.0.238")]
-[assembly: AssemblyFileVersion("0.2.0.238")]
+[assembly: AssemblyVersion("0.2.1.1")]
+[assembly: AssemblyFileVersion("0.2.1.1")]

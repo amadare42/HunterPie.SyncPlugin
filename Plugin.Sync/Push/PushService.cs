@@ -86,7 +86,7 @@ namespace Plugin.Sync.Push
             var sw = new Stopwatch();
             
             // a bit more that scan delay to increase chance of pushing 2 or 3 monsters at a time
-            var throttling = UserSettings.PlayerConfig.Overlay.GameScanDelay + 20;
+            var throttling = ConfigManager.Settings.Overlay.GameScanDelay + 20;
             throttling = throttling < MinThrottling ? MinThrottling : throttling;
             
             while (!token.IsCancellationRequested)
